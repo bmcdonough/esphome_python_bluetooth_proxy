@@ -372,7 +372,7 @@ def parse_message_frame(data: bytes) -> tuple[int, bytes, int]:
     if offset + payload_size > len(data):
         raise ProtocolError("Incomplete message frame")
 
-    payload = data[offset: offset + payload_size]
+    payload = data[offset : offset + payload_size]
     total_size = offset + payload_size
 
     return msg_type, payload, total_size
