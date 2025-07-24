@@ -9,6 +9,7 @@ exclude =
     .eggs,
     .venv,
     venv,
+    test_*.py,
     env,
     ENV,
     .tox,
