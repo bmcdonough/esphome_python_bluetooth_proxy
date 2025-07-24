@@ -247,7 +247,8 @@ class BluetoothProxy:
         # TODO: Implement scanner state message
         # This will be implemented when we add the protobuf messages
         logger.debug(
-            f"Sending scanner state to {api_connection} (scanning={self.scanning_enabled})"
+            f"Sending scanner state to {api_connection} "
+            f"(scanning={self.scanning_enabled})"
         )
 
     async def connect_device(self, address: int, address_type: int) -> bool:

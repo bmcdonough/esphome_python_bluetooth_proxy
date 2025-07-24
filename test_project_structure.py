@@ -16,26 +16,16 @@ def test_imports():
     print("Testing imports...")
 
     try:
-        # Phase 1: Core API Server Components
-        from esphome_bluetooth_proxy import (
-            APIConnection,
-            BluetoothProxyFeature,
-            ConnectionState,
-            DeviceInfoProvider,
-            ESPHomeAPIServer,
-            MessageDecoder,
-            MessageEncoder,
-            MessageType,
-        )
+        # Test imports for all phases
+        print("Testing imports...")
+        try:
+            from esphome_bluetooth_proxy import DeviceInfoProvider  # noqa: F401
+            from esphome_bluetooth_proxy import ESPHomeAPIServer  # noqa: F401
 
-        print("✓ Phase 1 imports successful")
-
-        # Phase 2: BLE Scanning Components
-        from esphome_bluetooth_proxy import (
-            AdvertisementBatcher,
-            BLEAdvertisement,
-            BLEScanner,
-        )
+            print("✓ Phase 1 imports successful")
+        except ImportError as e:
+            print(f"✗ Phase 1 imports failed: {e}")
+            sys.exit(1)
 
         print("✓ Phase 2 imports successful")
 

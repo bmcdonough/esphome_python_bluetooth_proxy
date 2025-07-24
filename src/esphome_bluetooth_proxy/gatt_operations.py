@@ -40,9 +40,9 @@ class GATTOperationHandler:
         """
         self.bluetooth_proxy = bluetooth_proxy
         self.pending_operations: Dict[str, GATTOperation] = {}
-        self.notification_subscriptions: Dict[int, Dict[int, bool]] = (
-            {}
-        )  # address -> {handle -> enabled}
+        self.notification_subscriptions: Dict[
+            int, Dict[int, bool]
+        ] = {}  # address -> {handle -> enabled}
 
         logger.debug("GATT operation handler initialized")
 
@@ -195,7 +195,8 @@ class GATTOperationHandler:
             enable: Whether to enable or disable notifications
         """
         logger.debug(
-            f"GATT notify request: device={address:012X} handle={handle} enable={enable}"
+            f"GATT notify request: device={address:012X} handle={handle} "
+            f"enable={enable}"
         )
 
         try:
@@ -246,7 +247,6 @@ class GATTOperationHandler:
             and handle in self.notification_subscriptions[address]
             and self.notification_subscriptions[address][handle]
         ):
-
             # Send notification to subscribed API connections
             await self._send_gatt_notification(address, handle, data)
         else:

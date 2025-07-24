@@ -13,7 +13,8 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from esphome_bluetooth_proxy.api_server import ESPHomeAPIServer
+# Import after path setup
+from esphome_bluetooth_proxy.api_server import ESPHomeAPIServer  # noqa: E402
 
 
 async def test_server():

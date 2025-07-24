@@ -138,7 +138,7 @@ class AdvertisementBatcher:
             # Limit pool size to prevent memory growth
             if len(self.advertisement_pool) > self.FLUSH_BATCH_SIZE * 2:
                 self.advertisement_pool = self.advertisement_pool[
-                    -self.FLUSH_BATCH_SIZE :
+                    -self.FLUSH_BATCH_SIZE:
                 ]
 
         except Exception as e:

@@ -202,7 +202,8 @@ class PairingManager:
         """
         # TODO: Implement protobuf message sending
         logger.debug(
-            f"Sending pairing response: device={address:012X} success={success} error={error}"
+            f"Sending pairing response: device={address:012X} success={success} "
+            f"error={error}"
         )
 
     async def _send_unpairing_response(
@@ -217,7 +218,8 @@ class PairingManager:
         """
         # TODO: Implement protobuf message sending
         logger.debug(
-            f"Sending unpairing response: device={address:012X} success={success} error={error}"
+            f"Sending unpairing response: device={address:012X} success={success} "
+            f"error={error}"
         )
 
     async def _send_cache_clear_response(
@@ -232,7 +234,8 @@ class PairingManager:
         """
         # TODO: Implement protobuf message sending
         logger.debug(
-            f"Sending cache clear response: device={address:012X} success={success} error={error}"
+            f"Sending cache clear response: device={address:012X} success={success} "
+            f"error={error}"
         )
 
     def is_paired(self, address: int) -> bool:

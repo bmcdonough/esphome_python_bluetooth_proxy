@@ -67,7 +67,7 @@ known_first_party = ["esphome_bluetooth_proxy"]
 [tool.flake8]
 max-line-length = 88
 extend-ignore = ["E203", "W503"]
-exclude = [".git", "__pycache__", "build", "dist", ".eggs", ".venv", "venv"]
+exclude = [".git", "__pycache__", "build", "dist", ".eggs", "test_*.py", ".venv", "venv"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

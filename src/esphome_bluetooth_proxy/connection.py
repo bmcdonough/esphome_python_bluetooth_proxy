@@ -146,14 +146,16 @@ class APIConnection:
 
         except Exception as e:
             logger.error(
-                f"Error handling message type {msg_type} from {self.client_address}: {e}"
+                f"Error handling message type {msg_type} from "
+                f"{self.client_address}: {e}"
             )
 
     async def _handle_hello_request(self, payload: bytes) -> None:
         """Handle HelloRequest message."""
         if self.state != ConnectionState.CONNECTING:
             logger.warning(
-                f"Unexpected HelloRequest from {self.client_address} in state {self.state}"
+                f"Unexpected HelloRequest from {self.client_address} in state "
+                f"{self.state}"
             )
             return
 
@@ -189,7 +191,8 @@ class APIConnection:
                 # Password required, wait for ConnectRequest
                 self.state = ConnectionState.CONNECTED
                 logger.debug(
-                    f"Client {self.client_address} connected, waiting for authentication"
+                    f"Client {self.client_address} connected, waiting for "
+                    f"authentication"
                 )
 
         except Exception as e:
@@ -199,7 +202,8 @@ class APIConnection:
         """Handle ConnectRequest message."""
         if self.state != ConnectionState.CONNECTED:
             logger.warning(
-                f"Unexpected ConnectRequest from {self.client_address} in state {self.state}"
+                f"Unexpected ConnectRequest from {self.client_address} in state "
+                f"{self.state}"
             )
             return
 
@@ -310,7 +314,8 @@ class APIConnection:
         """Public method to send a message to the client."""
         if self.state != ConnectionState.AUTHENTICATED:
             logger.warning(
-                f"Attempt to send message to unauthenticated client {self.client_address}"
+                f"Attempt to send message to unauthenticated client "
+                f"{self.client_address}"
             )
             return
 
@@ -336,4 +341,8 @@ class APIConnection:
 
     def __str__(self) -> str:
         """String representation of the connection."""
-        return f"APIConnection({self.client_address}, {self.state.name}, {self.client_info})"
+        return (
+            f"APIConnection({self.client_address}, "
+            f"{self.state.name}, "
+            f"{self.client_info})"
+        )
