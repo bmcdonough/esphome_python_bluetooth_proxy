@@ -1,0 +1,15 @@
+# Core dependencies for ESPHome Python Bluetooth Proxy
+# Bluetooth Low Energy support
+bleak>=0.21.0
+
+# ESPHome API client
+aioesphomeapi>=18.0.0
+
+# Async HTTP client for API calls
+aiohttp>=3.9.0
+
+# YAML configuration parsing
+PyYAML>=6.0
+
+# Logging utilities
+colorlog>=6.7.0
