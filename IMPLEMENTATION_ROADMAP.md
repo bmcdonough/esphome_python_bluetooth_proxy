@@ -48,7 +48,7 @@ class BluetoothProxyFeature:
 # src/esphome_bluetooth_proxy/api_server.py
 class ESPHomeAPIServer:
     """Main ESPHome API server implementing the 4-step handshake"""
-    
+
     async def start_server(self, host: str = "0.0.0.0", port: int = 6053)
     async def handle_client(self, reader: StreamReader, writer: StreamWriter)
     async def handle_hello_request(self, msg: HelloRequest) -> HelloResponse
@@ -62,7 +62,7 @@ class ESPHomeAPIServer:
 # src/esphome_bluetooth_proxy/protocol.py
 class MessageHandler:
     """Handles ESPHome protobuf message encoding/decoding"""
-    
+
     def encode_message(self, msg: ProtoMessage, msg_type: int) -> bytes
     def decode_message(self, data: bytes) -> tuple[int, ProtoMessage]
     def create_message_frame(self, msg_type: int, payload: bytes) -> bytes
@@ -78,7 +78,7 @@ class ConnectionState(Enum):
 
 class APIConnection:
     """Manages individual API client connections"""
-    
+
     def __init__(self, reader: StreamReader, writer: StreamWriter)
     async def authenticate(self, password: str) -> bool
     async def send_message(self, msg: ProtoMessage, msg_type: int)
@@ -90,7 +90,7 @@ class APIConnection:
 # src/esphome_bluetooth_proxy/device_info.py
 class DeviceInfoProvider:
     """Provides device information matching ESPHome format"""
-    
+
     def get_device_info(self) -> DeviceInfoResponse:
         # Returns device info with Bluetooth proxy capabilities
         # Includes feature flags, MAC address, version info
@@ -116,7 +116,7 @@ class DeviceInfoProvider:
 # src/esphome_bluetooth_proxy/ble_scanner.py
 class BLEScanner:
     """Manages BLE advertisement scanning using bleak"""
-    
+
     def __init__(self, callback: Callable[[BLEAdvertisement], None])
     async def start_scanning(self, active: bool = False)
     async def stop_scanning(self)
@@ -129,7 +129,7 @@ class BLEScanner:
 @dataclass
 class BLEAdvertisement:
     """Raw BLE advertisement data matching ESPHome format"""
-    
+
     address: int  # 48-bit MAC as uint64
     rssi: int
     address_type: int  # Public/Random
@@ -142,9 +142,9 @@ class BLEAdvertisement:
 # src/esphome_bluetooth_proxy/advertisement_batcher.py
 class AdvertisementBatcher:
     """Batches advertisements for efficient WiFi transmission"""
-    
+
     FLUSH_BATCH_SIZE = 16  # Match ESPHome optimization
-    
+
     def __init__(self, send_callback: Callable[[List[BLEAdvertisement]], None])
     def add_advertisement(self, adv: BLEAdvertisement)
     async def flush_batch(self)
@@ -156,7 +156,7 @@ class AdvertisementBatcher:
 # src/esphome_bluetooth_proxy/bluetooth_proxy.py
 class BluetoothProxy:
     """Main Bluetooth proxy coordinator"""
-    
+
     def __init__(self, api_server: ESPHomeAPIServer)
     async def start(self)
     async def handle_advertisement(self, adv: BLEAdvertisement)
@@ -182,7 +182,7 @@ class BluetoothProxy:
 # src/esphome_bluetooth_proxy/connection_pool.py
 class ConnectionPool:
     """Manages multiple BLE device connections"""
-    
+
     def __init__(self, max_connections: int = 3)
     async def connect_device(self, address: int, address_type: int) -> BLEConnection
     async def disconnect_device(self, address: int)
@@ -195,7 +195,7 @@ class ConnectionPool:
 # src/esphome_bluetooth_proxy/ble_connection.py
 class BLEConnection:
     """Individual BLE device connection handler"""
-    
+
     def __init__(self, address: int, address_type: int, proxy: BluetoothProxy)
     async def connect(self) -> bool
     async def disconnect(self)
@@ -209,7 +209,7 @@ class BLEConnection:
 # src/esphome_bluetooth_proxy/device_handler.py
 class DeviceRequestHandler:
     """Handles device connection requests from Home Assistant"""
-    
+
     async def handle_device_request(self, msg: BluetoothDeviceRequest)
     async def handle_connect_request(self, address: int, address_type: int)
     async def handle_disconnect_request(self, address: int)
@@ -234,7 +234,7 @@ class DeviceRequestHandler:
 # src/esphome_bluetooth_proxy/gatt_discovery.py
 class GATTServiceDiscovery:
     """Handles GATT service discovery"""
-    
+
     async def discover_services(self, connection: BLEConnection) -> List[BLEService]
     async def discover_characteristics(self, service: BLEService) -> List[BLECharacteristic]
     async def discover_descriptors(self, characteristic: BLECharacteristic) -> List[BLEDescriptor]
@@ -267,7 +267,7 @@ class BLEDescriptor:
 # src/esphome_bluetooth_proxy/service_handler.py
 class ServiceResponseHandler:
     """Handles GATT service discovery requests"""
-    
+
     async def handle_get_services_request(self, msg: BluetoothGATTGetServicesRequest)
     async def send_services_response(self, address: int, services: List[BLEService])
     async def send_services_done(self, address: int)
@@ -291,7 +291,7 @@ class ServiceResponseHandler:
 # src/esphome_bluetooth_proxy/gatt_operations.py
 class GATTOperations:
     """Handles GATT read/write operations"""
-    
+
     async def read_characteristic(self, connection: BLEConnection, handle: int) -> bytes
     async def write_characteristic(self, connection: BLEConnection, handle: int, data: bytes, response: bool) -> bool
     async def read_descriptor(self, connection: BLEConnection, handle: int) -> bytes
@@ -303,7 +303,7 @@ class GATTOperations:
 # src/esphome_bluetooth_proxy/gatt_handler.py
 class GATTRequestHandler:
     """Handles GATT operation requests from Home Assistant"""
-    
+
     async def handle_read_request(self, msg: BluetoothGATTReadRequest)
     async def handle_write_request(self, msg: BluetoothGATTWriteRequest)
     async def handle_read_descriptor_request(self, msg: BluetoothGATTReadDescriptorRequest)
@@ -315,7 +315,7 @@ class GATTRequestHandler:
 # src/esphome_bluetooth_proxy/gatt_responses.py
 class GATTResponseManager:
     """Manages GATT operation responses"""
-    
+
     async def send_read_response(self, address: int, handle: int, data: bytes)
     async def send_write_response(self, address: int, handle: int, success: bool)
     async def send_gatt_error(self, address: int, handle: int, error: int)
@@ -339,7 +339,7 @@ class GATTResponseManager:
 # src/esphome_bluetooth_proxy/notifications.py
 class NotificationManager:
     """Manages GATT notifications"""
-    
+
     def __init__(self, proxy: BluetoothProxy)
     async def subscribe_notifications(self, connection: BLEConnection, handle: int) -> bool
     async def unsubscribe_notifications(self, connection: BLEConnection, handle: int) -> bool
@@ -351,7 +351,7 @@ class NotificationManager:
 # src/esphome_bluetooth_proxy/notify_handler.py
 class NotificationRequestHandler:
     """Handles notification requests from Home Assistant"""
-    
+
     async def handle_notify_request(self, msg: BluetoothGATTNotifyRequest)
     async def send_notification_data(self, address: int, handle: int, data: bytes)
 ```
@@ -374,7 +374,7 @@ class NotificationRequestHandler:
 # src/esphome_bluetooth_proxy/pairing.py
 class PairingManager:
     """Handles device pairing operations"""
-    
+
     async def pair_device(self, address: int) -> bool
     async def unpair_device(self, address: int) -> bool
     async def clear_device_cache(self, address: int) -> bool
@@ -385,7 +385,7 @@ class PairingManager:
 # src/esphome_bluetooth_proxy/scanner_mode.py
 class ScannerModeManager:
     """Manages scanner active/passive modes"""
-    
+
     def set_scanner_mode(self, active: bool)
     def get_scanner_state(self) -> ScannerState
     async def send_scanner_state_update(self)

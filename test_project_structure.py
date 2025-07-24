@@ -60,7 +60,7 @@ def test_imports():
         return False
 
 
-def test_basic_functionality():
+async def test_basic_functionality():
     """Test basic functionality of key components."""
     print("\nTesting basic functionality...")
 
@@ -73,7 +73,7 @@ def test_basic_functionality():
 
         # Test device info provider
         provider = DeviceInfoProvider(name="test-proxy")
-        device_info = provider.get_device_info()
+        device_info = await provider.get_device_info()
 
         print(f"✓ Device info: {device_info.name}")
         print(f"✓ MAC address: {device_info.mac_address}")
@@ -98,7 +98,7 @@ def test_basic_functionality():
 
         # Test active connections
         provider.set_active_connections(True)
-        device_info_active = provider.get_device_info()
+        device_info_active = await provider.get_device_info()
 
         if device_info_active.bluetooth_proxy_feature_flags > expected_flags:
             print("✓ Active connection features enabled correctly")
@@ -186,7 +186,7 @@ def test_class_structure():
         return False
 
 
-def main():
+async def main():
     """Run all tests."""
     print("=" * 60)
     print("ESPHome Python Bluetooth Proxy - Project Structure Test")
@@ -199,7 +199,7 @@ def main():
         all_passed = False
 
     # Test basic functionality
-    if not test_basic_functionality():
+    if not await test_basic_functionality():
         all_passed = False
 
     # Test class structure
@@ -223,4 +223,6 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    import asyncio
+
+    sys.exit(asyncio.run(main()))

@@ -4,9 +4,13 @@ This module provides device information that matches the ESPHome format,
 including Bluetooth proxy capabilities and feature flags.
 """
 
+import logging
+import subprocess
 import uuid
 from datetime import datetime
 from typing import Optional
+
+from bleak import BleakScanner
 
 from .protocol import DeviceInfoResponse
 
@@ -48,7 +52,9 @@ class DeviceInfoProvider:
 
         # Generate a consistent MAC address based on device name
         self.mac_address = self._generate_mac_address()
-        self.bluetooth_mac_address = self._generate_bluetooth_mac_address()
+        # Read actual Bluetooth hardware address
+        self.bluetooth_mac_address = None  # Will be set asynchronously
+        self._bluetooth_mac_cached = None
 
         # Version and build info
         self.esphome_version = "2024.12.0"  # Match recent ESPHome version
@@ -67,16 +73,68 @@ class DeviceInfoProvider:
 
         return ":".join(f"{b:02X}" for b in mac_bytes)
 
-    def _generate_bluetooth_mac_address(self) -> str:
-        """Generate a Bluetooth MAC address (different from WiFi MAC)."""
-        # Use different namespace for Bluetooth MAC
-        namespace = uuid.UUID("6ba7b811-9dad-11d1-80b4-00c04fd430c8")
-        device_uuid = uuid.uuid5(namespace, self.name + "_bt")
+    async def _get_bluetooth_mac_address(self) -> str:
+        """Get the actual Bluetooth hardware MAC address."""
+        if self._bluetooth_mac_cached:
+            return self._bluetooth_mac_cached
 
-        mac_bytes = device_uuid.bytes[:6]
-        mac_bytes = bytes([mac_bytes[0] | 0x02 & 0xFE]) + mac_bytes[1:]
+        logger = logging.getLogger(__name__)
 
-        return ":".join(f"{b:02X}" for b in mac_bytes)
+        try:
+            # Try to get the Bluetooth adapter address using bleak
+            scanner = BleakScanner()
+            # Get the adapter info - this will give us the local adapter details
+            adapter = scanner._adapter if hasattr(scanner, "_adapter") else None
+
+            if adapter and hasattr(adapter, "address"):
+                mac_address = adapter.address
+                logger.info(f"Found Bluetooth adapter MAC: {mac_address}")
+                self._bluetooth_mac_cached = mac_address
+                return mac_address
+
+            # Fallback: try to read from system files (Linux)
+            try:
+                result = subprocess.run(
+                    ["hciconfig", "hci0"], capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    for line in result.stdout.split("\n"):
+                        if "BD Address:" in line:
+                            mac_address = (
+                                line.split("BD Address:")[1].strip().split()[0]
+                            )
+                            logger.info(
+                                f"Found Bluetooth MAC via hciconfig: {mac_address}"
+                            )
+                            self._bluetooth_mac_cached = mac_address
+                            return mac_address
+            except (subprocess.SubprocessError, FileNotFoundError):
+                pass
+
+            # Final fallback: generate a consistent address
+            logger.warning(
+                "Could not read hardware Bluetooth MAC, generating consistent fallback"
+            )
+            namespace = uuid.UUID("6ba7b811-9dad-11d1-80b4-00c04fd430c8")
+            device_uuid = uuid.uuid5(namespace, self.name + "_bt")
+            mac_bytes = device_uuid.bytes[:6]
+            mac_bytes = bytes([mac_bytes[0] | 0x02 & 0xFE]) + mac_bytes[1:]
+            mac_address = ":".join(f"{b:02X}" for b in mac_bytes)
+
+            self._bluetooth_mac_cached = mac_address
+            return mac_address
+
+        except Exception as e:
+            logger.error(f"Error reading Bluetooth MAC address: {e}")
+            # Generate fallback address
+            namespace = uuid.UUID("6ba7b811-9dad-11d1-80b4-00c04fd430c8")
+            device_uuid = uuid.uuid5(namespace, self.name + "_bt_fallback")
+            mac_bytes = device_uuid.bytes[:6]
+            mac_bytes = bytes([mac_bytes[0] | 0x02 & 0xFE]) + mac_bytes[1:]
+            mac_address = ":".join(f"{b:02X}" for b in mac_bytes)
+
+            self._bluetooth_mac_cached = mac_address
+            return mac_address
 
     def get_feature_flags(self) -> int:
         """Get Bluetooth proxy feature flags."""
@@ -96,8 +154,12 @@ class DeviceInfoProvider:
 
         return flags
 
-    def get_device_info(self) -> DeviceInfoResponse:
+    async def get_device_info(self) -> DeviceInfoResponse:
         """Get complete device information response."""
+        # Ensure we have the Bluetooth MAC address
+        if not self.bluetooth_mac_address:
+            self.bluetooth_mac_address = await self._get_bluetooth_mac_address()
+
         return DeviceInfoResponse(
             uses_password=self.password is not None,
             name=self.name,

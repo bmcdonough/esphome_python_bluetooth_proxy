@@ -244,8 +244,8 @@ class APIConnection:
             return
 
         try:
-            # Get device info from provider
-            device_info = self.device_info_provider()
+            # Get device info from provider (now async)
+            device_info = await self.device_info_provider()
 
             await self._send_message(
                 MessageType.DEVICE_INFO_RESPONSE,

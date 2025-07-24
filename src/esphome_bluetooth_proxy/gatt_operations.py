@@ -40,9 +40,9 @@ class GATTOperationHandler:
         """
         self.bluetooth_proxy = bluetooth_proxy
         self.pending_operations: Dict[str, GATTOperation] = {}
-        self.notification_subscriptions: Dict[int, Dict[int, bool]] = (
-            {}
-        )  # address -> {handle -> enabled}
+        self.notification_subscriptions: Dict[
+            int, Dict[int, bool]
+        ] = {}  # address -> {handle -> enabled}
 
         logger.debug("GATT operation handler initialized")
 
