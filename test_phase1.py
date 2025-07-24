@@ -21,20 +21,20 @@ async def test_server():
     # Setup logging
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-    
+
     logger = logging.getLogger(__name__)
     logger.info("Starting Phase 1 test: ESPHome API Server Foundation")
-    
+
     # Create server
     server = ESPHomeAPIServer(
         name="test-bluetooth-proxy",
         friendly_name="Test Python Bluetooth Proxy",
         password=None,  # No password for easier testing
-        active_connections=False  # Phase 1: passive only
+        active_connections=False,  # Phase 1: passive only
     )
-    
+
     logger.info("=" * 60)
     logger.info("ESPHome Python Bluetooth Proxy - Phase 1 Test")
     logger.info("=" * 60)
@@ -58,7 +58,7 @@ async def test_server():
     logger.info("")
     logger.info("Press Ctrl+C to stop the server")
     logger.info("=" * 60)
-    
+
     try:
         await server.start()
     except KeyboardInterrupt:
