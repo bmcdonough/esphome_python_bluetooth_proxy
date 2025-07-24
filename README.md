@@ -90,6 +90,12 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## References
+
+- [ESPHome Source Code](https://github.com/esphome/esphome/) - The original ESPHome project
+- [ESPHome Bluetooth Proxy Implementation](https://github.com/esphome/esphome/tree/dev/esphome/components/bluetooth_proxy) - Original C++ Bluetooth proxy component
+- [ESPHome Protocol Analysis](ESPHOME_PROTOCOL_ANALYSIS.md) - Detailed analysis of the ESPHome-Home Assistant connection protocol
+
 ## Acknowledgments
 
 - Original ESPHome Bluetooth proxy implementation
