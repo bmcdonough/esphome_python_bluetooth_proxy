@@ -1,7 +1,5 @@
 """Basic tests for ESPHome Bluetooth Proxy."""
 
-import pytest
-
 from esphome_bluetooth_proxy import __version__
 
 
