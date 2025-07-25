@@ -105,7 +105,7 @@ class ESPHomeAPIServer:
             addr = self.server.sockets[0].getsockname()
             logger.info(f"ESPHome API server started on {addr[0]}:{addr[1]}")
             logger.info(f"Device: {self.device_info_provider.friendly_name}")
-            logger.info(f"MAC: {self.device_info_provider.mac_address}")
+
             logger.info(
                 f"Bluetooth MAC: {self.device_info_provider.bluetooth_mac_address}"
             )
