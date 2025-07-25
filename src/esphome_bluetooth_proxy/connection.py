@@ -126,7 +126,7 @@ class APIConnection:
 
     async def _handle_message(self, msg_type: int, payload: bytes) -> None:
         """Handle a single message from the client."""
-        logger.debug(f"Received message type {msg_type} from {self.client_address}")
+        logger.info(f"Received message type {msg_type} from {self.client_address}")
 
         try:
             if msg_type == MessageType.HELLO_REQUEST:
@@ -184,18 +184,12 @@ class APIConnection:
                 MessageType.HELLO_RESPONSE, self.encoder.encode_hello_response(response)
             )
 
-            # Update state
-            if self.password is None:
-                # No password required, auto-authenticate
-                self.state = ConnectionState.AUTHENTICATED
-                logger.info(f"Client {self.client_address} authenticated (no password)")
-            else:
-                # Password required, wait for ConnectRequest
-                self.state = ConnectionState.CONNECTED
-                logger.debug(
-                    f"Client {self.client_address} connected, waiting for "
-                    f"authentication"
-                )
+            # Update state - always wait for ConnectRequest regardless of password
+            # This ensures proper protocol flow even when no password is required
+            self.state = ConnectionState.CONNECTED
+            logger.debug(
+                f"Client {self.client_address} connected, waiting for ConnectRequest"
+            )
 
         except Exception as e:
             logger.error(f"Error handling HelloRequest from {self.client_address}: {e}")
@@ -232,7 +226,11 @@ class APIConnection:
 
             if password_valid:
                 self.state = ConnectionState.AUTHENTICATED
-                logger.info(f"Client {self.client_address} authenticated successfully")
+                logger.info(f"Client {self.client_address} authenticated (no password)")
+                logger.debug(
+                    f"Client {self.client_address} ready for "
+                    f"DeviceInfo/ListEntities requests"
+                )
             else:
                 logger.warning(
                     f"Client {self.client_address} provided invalid password"
@@ -262,52 +260,91 @@ class APIConnection:
 
     async def _handle_device_info_request(self, payload: bytes) -> None:
         """Handle DeviceInfoRequest message."""
-        if self.state != ConnectionState.AUTHENTICATED:
+        logger.info(f"Received DeviceInfoRequest from {self.client_address}")
+
+        # Allow DeviceInfo requests in CONNECTED state if no password is required
+        # This supports aioesphomeapi client flow: Hello → DeviceInfo (skip Connect)
+        if self.state == ConnectionState.CONNECTED and self.password is None:
+            logger.debug(
+                f"Allowing DeviceInfo request from {self.client_address} "
+                f"(no password required)"
+            )
+        elif self.state != ConnectionState.AUTHENTICATED:
             logger.warning(
-                f"DeviceInfoRequest from unauthenticated client {self.client_address}"
+                f"DeviceInfoRequest from unauthenticated client "
+                f"{self.client_address} in state {self.state}"
             )
             return
 
         try:
             # Get device info from provider (now async)
+            logger.debug(f"Getting device info from provider for {self.client_address}")
             device_info = await self.device_info_provider()
+            logger.debug(f"Got device info: {device_info}")
+
+            # Encode the response
+            encoded_response = self.encoder.encode_device_info_response(device_info)
+            logger.debug(f"Encoded device info response: {len(encoded_response)} bytes")
 
             await self._send_message(
                 MessageType.DEVICE_INFO_RESPONSE,
-                self.encoder.encode_device_info_response(device_info),
+                encoded_response,
             )
 
-            logger.debug(f"Sent device info to {self.client_address}")
+            logger.info(f"Sent device info response to {self.client_address}")
 
         except Exception as e:
             logger.error(
                 f"Error handling DeviceInfoRequest from {self.client_address}: {e}"
             )
+            import traceback
+
+            logger.error(traceback.format_exc())
 
     async def _handle_list_entities_request(self, payload: bytes) -> None:
         """Handle ListEntitiesRequest message."""
-        if self.state != ConnectionState.AUTHENTICATED:
+        logger.info(f"Received ListEntitiesRequest from {self.client_address}")
+
+        # Allow ListEntities requests in CONNECTED state if no password is required
+        # This supports aioesphomeapi client flow:
+        # Hello → DeviceInfo → ListEntities (skip Connect)
+        if self.state == ConnectionState.CONNECTED and self.password is None:
+            logger.debug(
+                f"Allowing ListEntities request from {self.client_address} "
+                f"(no password required)"
+            )
+        elif self.state != ConnectionState.AUTHENTICATED:
             logger.warning(
-                f"ListEntitiesRequest from unauthenticated client {self.client_address}"
+                f"ListEntitiesRequest from unauthenticated client "
+                f"{self.client_address} in state {self.state}"
             )
             return
 
         try:
             # For now, just send empty entity list (no entities to report)
             # In future phases, this will include Bluetooth proxy entities
+            logger.debug(f"Sending empty entity list to {self.client_address}")
 
             response = ListEntitiesDoneResponse()
-            await self._send_message(
-                MessageType.LIST_ENTITIES_DONE_RESPONSE,
-                self.encoder.encode_list_entities_done_response(response),
+            encoded_response = self.encoder.encode_list_entities_done_response(response)
+            logger.debug(
+                f"Encoded list entities done response: {len(encoded_response)} bytes"
             )
 
-            logger.debug(f"Sent entity list to {self.client_address}")
+            await self._send_message(
+                MessageType.LIST_ENTITIES_DONE_RESPONSE,
+                encoded_response,
+            )
+
+            logger.info(f"Sent entity list done response to {self.client_address}")
 
         except Exception as e:
             logger.error(
                 f"Error handling ListEntitiesRequest from {self.client_address}: {e}"
             )
+            import traceback
+
+            logger.error(traceback.format_exc())
 
     async def _handle_ping_request(self) -> None:
         """Handle PingRequest message."""
