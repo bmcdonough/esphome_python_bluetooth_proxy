@@ -133,6 +133,8 @@ class APIConnection:
                 await self._handle_hello_request(payload)
             elif msg_type == MessageType.CONNECT_REQUEST:
                 await self._handle_connect_request(payload)
+            elif msg_type == MessageType.DISCONNECT_REQUEST:
+                await self._handle_disconnect_request(payload)
             elif msg_type == MessageType.DEVICE_INFO_REQUEST:
                 await self._handle_device_info_request(payload)
             elif msg_type == MessageType.LIST_ENTITIES_REQUEST:
@@ -200,10 +202,17 @@ class APIConnection:
 
     async def _handle_connect_request(self, payload: bytes) -> None:
         """Handle ConnectRequest message."""
-        if self.state != ConnectionState.CONNECTED:
+        if self.state == ConnectionState.AUTHENTICATED:
+            # Already authenticated, ignore duplicate ConnectRequest
+            logger.debug(
+                f"Ignoring duplicate ConnectRequest from {self.client_address} "
+                f"(already authenticated)"
+            )
+            return
+        elif self.state != ConnectionState.CONNECTED:
             logger.warning(
-                f"Unexpected ConnectRequest from {self.client_address} in state "
-                f"{self.state}"
+                f"Unexpected ConnectRequest from {self.client_address} "
+                f"in state {self.state}"
             )
             return
 
@@ -233,6 +242,22 @@ class APIConnection:
         except Exception as e:
             logger.error(
                 f"Error handling ConnectRequest from {self.client_address}: {e}"
+            )
+
+    async def _handle_disconnect_request(self, payload: bytes) -> None:
+        """Handle DisconnectRequest message."""
+        logger.info(f"Client {self.client_address} requested disconnect")
+
+        try:
+            # Send DisconnectResponse
+            await self._send_message(MessageType.DISCONNECT_RESPONSE, b"")
+
+            # Close the connection
+            await self.close()
+
+        except Exception as e:
+            logger.error(
+                f"Error handling DisconnectRequest from {self.client_address}: {e}"
             )
 
     async def _handle_device_info_request(self, payload: bytes) -> None:
