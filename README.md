@@ -21,9 +21,36 @@ This project aims to provide a Python alternative to the existing C++ ESPHome Bl
 
 ## Requirements
 
+### System Requirements
+
 - Python 3.12 or higher
 - Bluetooth adapter (built-in or USB)
 - ESPHome device with API enabled
+
+### System Dependencies (Ubuntu/Debian)
+
+Install the required system packages:
+
+```bash
+sudo apt update
+sudo apt install bluez bluez-utils
+```
+
+**Package descriptions:**
+- `bluez`: Core Bluetooth protocol stack for Linux
+- `bluez-utils`: Bluetooth utilities including `hciconfig` for hardware detection
+
+**Verify installation:**
+```bash
+# Check if Bluetooth service is running
+sudo systemctl status bluetooth
+
+# Verify Bluetooth adapter is detected
+hciconfig -a
+
+# Check for Bluetooth hardware
+lsusb | grep -i bluetooth
+```
 
 ## Installation
 
