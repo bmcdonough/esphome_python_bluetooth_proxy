@@ -55,6 +55,7 @@ class ESPHomeAPIServer:
         self.connections: List[APIConnection] = []
         self.server: Optional[asyncio.Server] = None
         self.running = False
+        self._shutdown_requested = False
 
         # Setup signal handlers for graceful shutdown
         self._setup_signal_handlers()
@@ -67,8 +68,20 @@ class ESPHomeAPIServer:
 
     def _signal_handler(self, signum: int, frame) -> None:
         """Handle shutdown signals."""
+        if self._shutdown_requested:
+            return  # Already shutting down, ignore additional signals
+
         logger.info(f"Received signal {signum}, shutting down...")
-        asyncio.create_task(self.stop())
+        self._shutdown_requested = True
+        self.running = False
+
+        # Set the shutdown flag for the event loop to handle
+        try:
+            loop = asyncio.get_running_loop()
+            loop.call_soon_threadsafe(lambda: asyncio.create_task(self._shutdown()))
+        except RuntimeError:
+            # No running loop, exit immediately
+            sys.exit(0)
 
     async def start(self) -> None:
         """Start the API server."""
@@ -101,11 +114,53 @@ class ESPHomeAPIServer:
 
             # Start serving
             async with self.server:
-                await self.server.serve_forever()
+                try:
+                    await self.server.serve_forever()
+                except asyncio.CancelledError:
+                    logger.info("Server serve_forever cancelled")
+                    pass
 
         except Exception as e:
             logger.error(f"Failed to start server: {e}")
             raise
+
+    async def _shutdown(self) -> None:
+        """Internal shutdown method called from signal handler."""
+        await self.stop()
+
+        # Get current task to avoid cancelling ourselves
+        current_task = asyncio.current_task()
+        tasks = [
+            task
+            for task in asyncio.all_tasks()
+            if not task.done() and task is not current_task
+        ]
+
+        if tasks:
+            logger.info(f"Cancelling {len(tasks)} remaining tasks...")
+            for task in tasks:
+                if not task.cancelled():
+                    task.cancel()
+
+            # Wait for tasks to complete cancellation with timeout
+            if tasks:
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(*tasks, return_exceptions=True), timeout=3.0
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        "Some tasks did not complete cancellation within timeout"
+                    )
+                except Exception as e:
+                    logger.warning(f"Error during task cancellation: {e}")
+
+        # Stop the event loop
+        try:
+            loop = asyncio.get_running_loop()
+            loop.stop()
+        except Exception as e:
+            logger.warning(f"Error stopping event loop: {e}")
 
     async def stop(self) -> None:
         """Stop the API server."""
@@ -208,10 +263,13 @@ async def main() -> None:
         await server.start()
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt")
+    except asyncio.CancelledError:
+        logger.info("Main task cancelled")
     except Exception as e:
         logger.error(f"Server error: {e}")
     finally:
-        await server.stop()
+        if server.running:
+            await server.stop()
 
 
 if __name__ == "__main__":
