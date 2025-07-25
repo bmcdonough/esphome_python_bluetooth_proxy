@@ -90,6 +90,12 @@ class ESPHomeAPIServer:
             return
 
         try:
+            # Initialize Bluetooth MAC address before starting server
+            if not self.device_info_provider.bluetooth_mac_address:
+                self.device_info_provider.bluetooth_mac_address = (
+                    await self.device_info_provider._get_bluetooth_mac_address()
+                )
+
             self.server = await asyncio.start_server(
                 self._handle_client, self.host, self.port
             )
