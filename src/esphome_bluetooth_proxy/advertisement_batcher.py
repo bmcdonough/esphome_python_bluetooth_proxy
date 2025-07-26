@@ -43,9 +43,6 @@ class AdvertisementBatcher:
         # Flush timer
         self.flush_timer: Optional[asyncio.TimerHandle] = None
 
-        # Pre-allocate batch capacity
-        self.advertisement_batch.reserve = self.FLUSH_BATCH_SIZE
-
         logger.debug(
             f"Advertisement batcher initialized (batch_size={self.FLUSH_BATCH_SIZE})"
         )

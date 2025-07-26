@@ -11,6 +11,8 @@ from enum import IntEnum
 from typing import Callable, Optional
 
 from .protocol import (
+    BluetoothLEAdvertisementResponse,
+    BluetoothLERawAdvertisementsResponse,
     ConnectResponse,
     DeviceInfoResponse,
     HelloResponse,
@@ -390,6 +392,67 @@ class APIConnection:
     def is_connected(self) -> bool:
         """Check if the connection is still active."""
         return not self.writer.is_closing()
+
+    async def send_bluetooth_le_advertisements(self, advertisements: list) -> None:
+        """Send batch of BLE advertisements to client.
+
+        Args:
+            advertisements: List of BLEAdvertisement objects
+        """
+        if self.state not in [ConnectionState.AUTHENTICATED, ConnectionState.CONNECTED]:
+            logger.debug(
+                f"Skipping BLE advertisements to {self.client_address} "
+                f"(state: {self.state})"
+            )
+            return
+
+        try:
+            # Convert BLEAdvertisement objects to protocol messages
+            protocol_advertisements = []
+            for adv in advertisements:
+                protocol_adv = BluetoothLEAdvertisementResponse(
+                    address=adv.address,
+                    rssi=adv.rssi,
+                    address_type=adv.address_type,
+                    data=adv.data,
+                )
+                protocol_advertisements.append(protocol_adv)
+
+            # Create batch response message
+            batch_response = BluetoothLERawAdvertisementsResponse(
+                advertisements=protocol_advertisements
+            )
+
+            # Encode and send
+            payload = self.encoder.encode_bluetooth_le_raw_advertisements_response(
+                batch_response
+            )
+            frame = create_message_frame(
+                MessageType.BLUETOOTH_LE_RAW_ADVERTISEMENTS_RESPONSE, payload
+            )
+
+            self.writer.write(frame)
+            await self.writer.drain()
+
+            logger.debug(
+                f"Sent {len(advertisements)} BLE advertisements to "
+                f"{self.client_address}"
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Error sending BLE advertisements to {self.client_address}: {e}"
+            )
+
+    def is_bluetooth_subscribed(self) -> bool:
+        """Check if connection is subscribed to Bluetooth events.
+
+        Returns:
+            bool: True if subscribed to Bluetooth events
+        """
+        # For now, assume all authenticated connections want BLE advertisements
+        # In a full implementation, this would check subscription flags
+        return self.state in [ConnectionState.AUTHENTICATED, ConnectionState.CONNECTED]
 
     async def close(self) -> None:
         """Close the connection."""

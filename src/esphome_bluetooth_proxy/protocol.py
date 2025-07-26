@@ -27,6 +27,10 @@ class MessageType(IntEnum):
     LIST_ENTITIES_REQUEST = 11
     LIST_ENTITIES_DONE_RESPONSE = 19
 
+    # Bluetooth LE messages
+    BLUETOOTH_LE_ADVERTISEMENT_RESPONSE = 24
+    BLUETOOTH_LE_RAW_ADVERTISEMENTS_RESPONSE = 25
+
 
 @dataclass
 class HelloRequest:
@@ -100,6 +104,23 @@ class ListEntitiesDoneResponse:
     """List entities done response message to client."""
 
     pass
+
+
+@dataclass
+class BluetoothLEAdvertisementResponse:
+    """Single BLE advertisement response message."""
+
+    address: int  # 48-bit MAC as uint64
+    rssi: int
+    address_type: int  # 0=Public, 1=Random
+    data: bytes  # Raw advertisement data
+
+
+@dataclass
+class BluetoothLERawAdvertisementsResponse:
+    """Batch of BLE advertisements response message."""
+
+    advertisements: list  # List of BluetoothLEAdvertisementResponse
 
 
 class ProtocolError(Exception):
@@ -276,6 +297,47 @@ class MessageEncoder:
     ) -> bytes:
         """Encode ListEntitiesDoneResponse message."""
         return b""  # Empty message
+
+    def encode_bluetooth_le_advertisement_response(
+        self, msg: BluetoothLEAdvertisementResponse
+    ) -> bytes:
+        """Encode BluetoothLEAdvertisementResponse message."""
+        data = bytearray()
+
+        # Field 1: address (uint64)
+        data.extend(b"\x08")  # Field 1, varint
+        data.extend(encode_varint(msg.address))
+
+        # Field 2: rssi (int32)
+        data.extend(b"\x10")  # Field 2, varint
+        data.extend(encode_varint(msg.rssi & 0xFFFFFFFF))  # Handle negative values
+
+        # Field 3: address_type (uint32)
+        data.extend(b"\x18")  # Field 3, varint
+        data.extend(encode_varint(msg.address_type))
+
+        # Field 4: data (bytes)
+        if msg.data:
+            data.extend(b"\x22")  # Field 4, length-delimited
+            data.extend(encode_varint(len(msg.data)))
+            data.extend(msg.data)
+
+        return bytes(data)
+
+    def encode_bluetooth_le_raw_advertisements_response(
+        self, msg: BluetoothLERawAdvertisementsResponse
+    ) -> bytes:
+        """Encode BluetoothLERawAdvertisementsResponse message."""
+        data = bytearray()
+
+        # Field 1: advertisements (repeated BluetoothLEAdvertisementResponse)
+        for advertisement in msg.advertisements:
+            data.extend(b"\x0a")  # Field 1, length-delimited
+            adv_data = self.encode_bluetooth_le_advertisement_response(advertisement)
+            data.extend(encode_varint(len(adv_data)))
+            data.extend(adv_data)
+
+        return bytes(data)
 
 
 class MessageDecoder:

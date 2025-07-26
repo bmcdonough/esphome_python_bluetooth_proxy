@@ -11,6 +11,7 @@ import sys
 from asyncio import StreamReader, StreamWriter
 from typing import List, Optional
 
+from .bluetooth_proxy import BluetoothProxy
 from .connection import APIConnection
 from .device_info import DeviceInfoProvider
 
@@ -57,6 +58,9 @@ class ESPHomeAPIServer:
         self.running = False
         self._shutdown_requested = False
 
+        # Bluetooth proxy
+        self.bluetooth_proxy: Optional[BluetoothProxy] = None
+
         # Setup signal handlers for graceful shutdown
         self._setup_signal_handlers()
 
@@ -95,6 +99,11 @@ class ESPHomeAPIServer:
                 self.device_info_provider.bluetooth_mac_address = (
                     await self.device_info_provider._get_bluetooth_mac_address()
                 )
+
+            # Initialize and start Bluetooth proxy
+            self.bluetooth_proxy = BluetoothProxy(self, max_connections=3)
+            await self.bluetooth_proxy.start()
+            logger.info("Bluetooth proxy initialized and started")
 
             self.server = await asyncio.start_server(
                 self._handle_client, self.host, self.port
@@ -176,15 +185,20 @@ class ESPHomeAPIServer:
         logger.info("Stopping API server...")
         self.running = False
 
+        # Stop Bluetooth proxy
+        if self.bluetooth_proxy:
+            await self.bluetooth_proxy.stop()
+            logger.info("Bluetooth proxy stopped")
+
         # Close all client connections
         close_tasks = []
-        for connection in self.connections[
-            :
-        ]:  # Copy list to avoid modification during iteration
+        for connection in self.connections:
             close_tasks.append(connection.close())
 
         if close_tasks:
             await asyncio.gather(*close_tasks, return_exceptions=True)
+
+        self.connections.clear()
 
         # Stop the server
         if self.server:
@@ -206,11 +220,20 @@ class ESPHomeAPIServer:
         self.connections.append(connection)
 
         try:
+            # Subscribe to Bluetooth events (will check authentication state internally)
+            await self.subscribe_connection_to_bluetooth(connection)
+
             # Handle the connection
             await connection.handle_connection()
         except Exception as e:
             logger.error(f"Error handling client connection: {e}")
         finally:
+            # Unsubscribe from Bluetooth events
+            try:
+                await self.unsubscribe_connection_from_bluetooth(connection)
+            except Exception as e:
+                logger.error(f"Error unsubscribing connection: {e}")
+
             # Remove from connection list
             if connection in self.connections:
                 self.connections.remove(connection)
@@ -240,9 +263,38 @@ class ESPHomeAPIServer:
             await asyncio.gather(*send_tasks, return_exceptions=True)
 
     def set_active_connections(self, active: bool) -> None:
-        """Enable or disable active connection support."""
+        """Set whether active connections are supported.
+
+        Args:
+            active: Whether to support active connections
+        """
         self.device_info_provider.set_active_connections(active)
-        logger.info(f"Active connections {'enabled' if active else 'disabled'}")
+
+    async def subscribe_connection_to_bluetooth(
+        self, connection: APIConnection
+    ) -> None:
+        """Subscribe API connection to Bluetooth events.
+
+        Args:
+            connection: API connection to subscribe
+        """
+        if self.bluetooth_proxy:
+            await self.bluetooth_proxy.subscribe_api_connection(connection, flags=0)
+            logger.debug(f"Subscribed {connection.client_address} to Bluetooth events")
+
+    async def unsubscribe_connection_from_bluetooth(
+        self, connection: APIConnection
+    ) -> None:
+        """Unsubscribe API connection from Bluetooth events.
+
+        Args:
+            connection: API connection to unsubscribe
+        """
+        if self.bluetooth_proxy:
+            await self.bluetooth_proxy.unsubscribe_api_connection(connection)
+            logger.debug(
+                f"Unsubscribed {connection.client_address} from Bluetooth events"
+            )
 
     def has_active_connections(self) -> bool:
         """Check if active connections are supported."""

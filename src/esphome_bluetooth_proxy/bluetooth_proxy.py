@@ -7,13 +7,15 @@ ESPHome C++ implementation.
 
 import asyncio
 import logging
-from typing import Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from .advertisement_batcher import AdvertisementBatcher
-from .api_server import ESPHomeAPIServer
 from .ble_connection import BLEConnection
 from .ble_scanner import BLEAdvertisement, BLEScanner
 from .connection import APIConnection
+
+if TYPE_CHECKING:
+    from .api_server import ESPHomeAPIServer
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,7 @@ class BluetoothProxy:
     connections, and GATT operations.
     """
 
-    def __init__(self, api_server: ESPHomeAPIServer, max_connections: int = 3):
+    def __init__(self, api_server: "ESPHomeAPIServer", max_connections: int = 3):
         """Initialize Bluetooth proxy.
 
         Args:
@@ -73,6 +75,9 @@ class BluetoothProxy:
 
             # Initialize connection pool
             self._initialize_connection_pool()
+
+            # Start BLE scanning
+            await self._start_scanning()
 
             self.running = True
             logger.info("Bluetooth proxy started successfully")
@@ -173,8 +178,8 @@ class BluetoothProxy:
 
         try:
             await self.scanner.start_scanning(
-                active=False
-            )  # Start with passive scanning
+                active=True
+            )  # Start with active scanning (more reliable)
             self.scanning_enabled = True
 
             # Notify all subscribed connections
@@ -218,25 +223,23 @@ class BluetoothProxy:
         # Add to batch for efficient transmission
         self.advertisement_batcher.add_advertisement(advertisement)
 
-    def _send_advertisement_batch(self, advertisements: List[BLEAdvertisement]) -> None:
+    def _send_advertisement_batch(self, advertisements: List[BLEAdvertisement]):
         """Send batch of advertisements to subscribed connections.
 
         Args:
             advertisements: List of advertisements to send
         """
-        if not self.subscribed_connections:
-            return
+        logger.debug(
+            f"Sending advertisement batch ({len(advertisements)} advertisements) "
+            f"to {len(self.subscribed_connections)} connections"
+        )
 
-        logger.debug(f"Sending batch of {len(advertisements)} advertisements")
-
-        # TODO: Implement actual protobuf message sending
-        # This will be implemented in Phase 2 when we add the protobuf messages
-        # For now, just log the advertisements
-        for adv in advertisements:
-            logger.debug(
-                f"Advertisement: {adv.address:012X} RSSI={adv.rssi} "
-                f"Type={adv.address_type} Data={len(adv.data)} bytes"
-            )
+        # Send advertisements to subscribed API connections
+        for api_connection in self.subscribed_connections:
+            if api_connection.is_bluetooth_subscribed():
+                asyncio.create_task(
+                    api_connection.send_bluetooth_le_advertisements(advertisements)
+                )
 
     async def _send_scanner_state(self, api_connection: APIConnection) -> None:
         """Send scanner state to API connection.

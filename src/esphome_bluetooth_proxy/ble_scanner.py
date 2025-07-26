@@ -45,7 +45,7 @@ class BLEScanner:
         self.scanning = False
         self.active_scan = False
 
-    async def start_scanning(self, active: bool = False) -> None:
+    async def start_scanning(self, active: bool = True) -> None:
         """Start BLE scanning.
 
         Args:
@@ -69,6 +69,29 @@ class BLEScanner:
             logger.info("BLE scanning started successfully")
 
         except Exception as e:
+            # If passive scanning fails, try active scanning as fallback
+            if not active and "passive scanning mode requires" in str(e):
+                logger.warning(
+                    f"Passive scanning failed ({e}), falling back to active scanning"
+                )
+                try:
+                    self.active_scan = True
+                    self.scanner = BleakScanner(
+                        detection_callback=self._on_advertisement,
+                        scanning_mode="active",
+                    )
+                    await self.scanner.start()
+                    self.scanning = True
+                    logger.info(
+                        "BLE scanning started successfully with active mode fallback"
+                    )
+                    return
+                except Exception as fallback_e:
+                    logger.error(
+                        f"Fallback to active scanning also failed: {fallback_e}"
+                    )
+                    raise fallback_e
+
             logger.error(f"Failed to start BLE scanning: {e}")
             raise
 
