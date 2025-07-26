@@ -201,7 +201,8 @@ class GATTOperationHandler:
             enable: Whether to enable or disable notifications
         """
         logger.debug(
-            f"GATT notify request: device={address:012X} handle={handle} enable={enable}"
+            f"GATT notify request: device={address:012X} handle={handle} "
+            f"enable={enable}"
         )
 
         try:
@@ -224,17 +225,21 @@ class GATTOperationHandler:
                     asyncio.create_task(
                         self.handle_notification_data(address, handle, data)
                     )
-                
+
                 # Start notifications
                 success = await connection.start_notify(handle, notification_callback)
                 if not success:
-                    await self._send_gatt_error(address, handle, "Failed to enable notifications")
+                    await self._send_gatt_error(
+                        address, handle, "Failed to enable notifications"
+                    )
                     return
             else:
                 # Stop notifications
                 success = await connection.stop_notify(handle)
                 if not success:
-                    await self._send_gatt_error(address, handle, "Failed to disable notifications")
+                    await self._send_gatt_error(
+                        address, handle, "Failed to disable notifications"
+                    )
                     return
 
             logger.debug(
@@ -404,7 +409,9 @@ class GATTOperationHandler:
                             MessageType.BLUETOOTH_GATT_READ_RESPONSE, payload
                         )
 
-            logger.error(f"GATT error: device={address:012X} handle={handle} error={error}")
+            logger.error(
+                f"GATT error: device={address:012X} handle={handle} error={error}"
+            )
         except Exception as e:
             logger.error(f"Error sending GATT error response: {e}")
 

@@ -422,7 +422,8 @@ class BLEConnection:
             # Read value
             value = await self.client.read_gatt_descriptor(desc.uuid)
             logger.debug(
-                f"Read {len(value)} bytes from descriptor {handle} on {self.address_str}"
+                f"Read {len(value)} bytes from descriptor {handle} "
+                f"on {self.address_str}"
             )
             return value
 
@@ -454,7 +455,8 @@ class BLEConnection:
             # Write value
             await self.client.write_gatt_descriptor(desc.uuid, data)
             logger.debug(
-                f"Wrote {len(data)} bytes to descriptor {handle} on {self.address_str}"
+                f"Wrote {len(data)} bytes to descriptor {handle} "
+                f"on {self.address_str}"
             )
             return True
 
@@ -464,7 +466,9 @@ class BLEConnection:
             )
             return False
 
-    async def start_notify(self, handle: int, callback: Callable[[bytes], None]) -> bool:
+    async def start_notify(
+        self, handle: int, callback: Callable[[bytes], None]
+    ) -> bool:
         """Start notifications for a characteristic.
 
         Args:
@@ -486,15 +490,16 @@ class BLEConnection:
             # Start notifications
             await self.client.start_notify(char.uuid, callback)
             self.notification_handlers[handle] = callback
-            
+
             logger.debug(
-                f"Started notifications for handle {handle} on {self.address_str}"
+                f"Started notifications for handle {handle} " f"on {self.address_str}"
             )
             return True
 
         except Exception as e:
             logger.error(
-                f"Failed to start notifications for handle {handle} on {self.address_str}: {e}"
+                f"Failed to start notifications for handle {handle} "
+                f"on {self.address_str}: {e}"
             )
             return False
 
@@ -518,11 +523,11 @@ class BLEConnection:
 
             # Stop notifications
             await self.client.stop_notify(char.uuid)
-            
+
             # Remove callback
             if handle in self.notification_handlers:
                 del self.notification_handlers[handle]
-            
+
             logger.debug(
                 f"Stopped notifications for handle {handle} on {self.address_str}"
             )
@@ -530,7 +535,8 @@ class BLEConnection:
 
         except Exception as e:
             logger.error(
-                f"Failed to stop notifications for handle {handle} on {self.address_str}: {e}"
+                f"Failed to stop notifications for handle {handle} "
+                f"on {self.address_str}: {e}"
             )
             return False
 

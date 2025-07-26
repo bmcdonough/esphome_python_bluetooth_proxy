@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 from .advertisement_batcher import AdvertisementBatcher
 from .ble_connection import BLEConnection
 from .ble_scanner import BLEAdvertisement, BLEScanner
-from .gatt_operations import GATTOperationHandler
 from .connection import APIConnection
+from .gatt_operations import GATTOperationHandler
 
 if TYPE_CHECKING:
     from .api_server import ESPHomeAPIServer

@@ -540,10 +540,14 @@ class APIConnection:
         except Exception as e:
             logger.error(f"Error handling GATT notify request: {e}")
 
-    async def _handle_bluetooth_gatt_read_descriptor_request(self, payload: bytes) -> None:
+    async def _handle_bluetooth_gatt_read_descriptor_request(
+        self, payload: bytes
+    ) -> None:
         """Handle BluetoothGATTReadDescriptorRequest message."""
         try:
-            request = self.decoder.decode_bluetooth_gatt_read_descriptor_request(payload)
+            request = self.decoder.decode_bluetooth_gatt_read_descriptor_request(
+                payload
+            )
             logger.debug(
                 f"GATT read descriptor request from {self.client_address}: "
                 f"address={request.address:012X} handle={request.handle}"
@@ -560,10 +564,14 @@ class APIConnection:
         except Exception as e:
             logger.error(f"Error handling GATT read descriptor request: {e}")
 
-    async def _handle_bluetooth_gatt_write_descriptor_request(self, payload: bytes) -> None:
+    async def _handle_bluetooth_gatt_write_descriptor_request(
+        self, payload: bytes
+    ) -> None:
         """Handle BluetoothGATTWriteDescriptorRequest message."""
         try:
-            request = self.decoder.decode_bluetooth_gatt_write_descriptor_request(payload)
+            request = self.decoder.decode_bluetooth_gatt_write_descriptor_request(
+                payload
+            )
             logger.debug(
                 f"GATT write descriptor request from {self.client_address}: "
                 f"address={request.address:012X} handle={request.handle} "
