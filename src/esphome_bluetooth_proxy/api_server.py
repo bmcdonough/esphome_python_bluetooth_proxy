@@ -216,6 +216,10 @@ class ESPHomeAPIServer:
             password=self.password,
         )
 
+        # Add GATT handler reference if Bluetooth proxy is available
+        if self.bluetooth_proxy and hasattr(self.bluetooth_proxy, 'gatt_handler'):
+            connection.gatt_handler = self.bluetooth_proxy.gatt_handler
+
         # Add to connection list
         self.connections.append(connection)
 

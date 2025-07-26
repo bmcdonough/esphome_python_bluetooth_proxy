@@ -156,6 +156,10 @@ class APIConnection:
                 await self._handle_bluetooth_gatt_write_request(payload)
             elif msg_type == MessageType.BLUETOOTH_GATT_NOTIFY_REQUEST:
                 await self._handle_bluetooth_gatt_notify_request(payload)
+            elif msg_type == MessageType.BLUETOOTH_GATT_READ_DESCRIPTOR_REQUEST:
+                await self._handle_bluetooth_gatt_read_descriptor_request(payload)
+            elif msg_type == MessageType.BLUETOOTH_GATT_WRITE_DESCRIPTOR_REQUEST:
+                await self._handle_bluetooth_gatt_write_descriptor_request(payload)
             else:
                 logger.warning(
                     f"Unknown message type {msg_type} from {self.client_address}"
@@ -535,6 +539,47 @@ class APIConnection:
 
         except Exception as e:
             logger.error(f"Error handling GATT notify request: {e}")
+
+    async def _handle_bluetooth_gatt_read_descriptor_request(self, payload: bytes) -> None:
+        """Handle BluetoothGATTReadDescriptorRequest message."""
+        try:
+            request = self.decoder.decode_bluetooth_gatt_read_descriptor_request(payload)
+            logger.debug(
+                f"GATT read descriptor request from {self.client_address}: "
+                f"address={request.address:012X} handle={request.handle}"
+            )
+
+            # Forward to GATT operations handler if available
+            if hasattr(self, "gatt_handler") and self.gatt_handler:
+                await self.gatt_handler.handle_gatt_read_descriptor_request(
+                    request.address, request.handle
+                )
+            else:
+                logger.warning("No GATT handler available for read descriptor request")
+
+        except Exception as e:
+            logger.error(f"Error handling GATT read descriptor request: {e}")
+
+    async def _handle_bluetooth_gatt_write_descriptor_request(self, payload: bytes) -> None:
+        """Handle BluetoothGATTWriteDescriptorRequest message."""
+        try:
+            request = self.decoder.decode_bluetooth_gatt_write_descriptor_request(payload)
+            logger.debug(
+                f"GATT write descriptor request from {self.client_address}: "
+                f"address={request.address:012X} handle={request.handle} "
+                f"data={len(request.data)} bytes"
+            )
+
+            # Forward to GATT operations handler if available
+            if hasattr(self, "gatt_handler") and self.gatt_handler:
+                await self.gatt_handler.handle_gatt_write_descriptor_request(
+                    request.address, request.handle, request.data
+                )
+            else:
+                logger.warning("No GATT handler available for write descriptor request")
+
+        except Exception as e:
+            logger.error(f"Error handling GATT write descriptor request: {e}")
 
     async def _send_message(self, msg_type: int, payload: bytes) -> None:
         """Send a message to the client."""

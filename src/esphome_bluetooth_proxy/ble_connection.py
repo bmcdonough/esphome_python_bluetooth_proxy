@@ -382,6 +382,158 @@ class BLEConnection:
                     return char
         return None
 
+    def _find_descriptor_by_handle(self, handle: int):
+        """Find bleak descriptor by handle.
+
+        Args:
+            handle: Descriptor handle
+
+        Returns:
+            Optional[BleakGATTDescriptor]: Descriptor if found
+        """
+        if not self.client:
+            return None
+
+        for service in self.client.services:
+            for char in service.characteristics:
+                for desc in char.descriptors:
+                    if desc.handle == handle:
+                        return desc
+        return None
+
+    async def read_descriptor(self, handle: int) -> bytes:
+        """Read descriptor value.
+
+        Args:
+            handle: Descriptor handle
+
+        Returns:
+            bytes: Descriptor value
+        """
+        if not self.is_connected():
+            raise RuntimeError("Device not connected")
+
+        try:
+            # Find descriptor by handle
+            desc = self._find_descriptor_by_handle(handle)
+            if not desc:
+                raise ValueError(f"Descriptor with handle {handle} not found")
+
+            # Read value
+            value = await self.client.read_gatt_descriptor(desc.uuid)
+            logger.debug(
+                f"Read {len(value)} bytes from descriptor {handle} on {self.address_str}"
+            )
+            return value
+
+        except Exception as e:
+            logger.error(
+                f"Failed to read descriptor {handle} on {self.address_str}: {e}"
+            )
+            raise
+
+    async def write_descriptor(self, handle: int, data: bytes) -> bool:
+        """Write descriptor value.
+
+        Args:
+            handle: Descriptor handle
+            data: Data to write
+
+        Returns:
+            bool: True if write successful
+        """
+        if not self.is_connected():
+            raise RuntimeError("Device not connected")
+
+        try:
+            # Find descriptor by handle
+            desc = self._find_descriptor_by_handle(handle)
+            if not desc:
+                raise ValueError(f"Descriptor with handle {handle} not found")
+
+            # Write value
+            await self.client.write_gatt_descriptor(desc.uuid, data)
+            logger.debug(
+                f"Wrote {len(data)} bytes to descriptor {handle} on {self.address_str}"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(
+                f"Failed to write descriptor {handle} on {self.address_str}: {e}"
+            )
+            return False
+
+    async def start_notify(self, handle: int, callback: Callable[[bytes], None]) -> bool:
+        """Start notifications for a characteristic.
+
+        Args:
+            handle: Characteristic handle
+            callback: Callback function for notification data
+
+        Returns:
+            bool: True if notification started successfully
+        """
+        if not self.is_connected():
+            raise RuntimeError("Device not connected")
+
+        try:
+            # Find characteristic by handle
+            char = self._find_characteristic_by_handle(handle)
+            if not char:
+                raise ValueError(f"Characteristic with handle {handle} not found")
+
+            # Start notifications
+            await self.client.start_notify(char.uuid, callback)
+            self.notification_handlers[handle] = callback
+            
+            logger.debug(
+                f"Started notifications for handle {handle} on {self.address_str}"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(
+                f"Failed to start notifications for handle {handle} on {self.address_str}: {e}"
+            )
+            return False
+
+    async def stop_notify(self, handle: int) -> bool:
+        """Stop notifications for a characteristic.
+
+        Args:
+            handle: Characteristic handle
+
+        Returns:
+            bool: True if notification stopped successfully
+        """
+        if not self.is_connected():
+            raise RuntimeError("Device not connected")
+
+        try:
+            # Find characteristic by handle
+            char = self._find_characteristic_by_handle(handle)
+            if not char:
+                raise ValueError(f"Characteristic with handle {handle} not found")
+
+            # Stop notifications
+            await self.client.stop_notify(char.uuid)
+            
+            # Remove callback
+            if handle in self.notification_handlers:
+                del self.notification_handlers[handle]
+            
+            logger.debug(
+                f"Stopped notifications for handle {handle} on {self.address_str}"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(
+                f"Failed to stop notifications for handle {handle} on {self.address_str}: {e}"
+            )
+            return False
+
     def is_connected(self) -> bool:
         """Check if device is connected.
 

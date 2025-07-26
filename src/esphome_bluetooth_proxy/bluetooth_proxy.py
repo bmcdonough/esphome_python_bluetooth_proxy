@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 from .advertisement_batcher import AdvertisementBatcher
 from .ble_connection import BLEConnection
 from .ble_scanner import BLEAdvertisement, BLEScanner
+from .gatt_operations import GATTOperationHandler
 from .connection import APIConnection
 
 if TYPE_CHECKING:
@@ -46,6 +47,9 @@ class BluetoothProxy:
         # Connection management
         self.connections: Dict[int, BLEConnection] = {}  # address -> connection
         self.connection_pool: List[BLEConnection] = []
+
+        # GATT operations handler
+        self.gatt_handler = GATTOperationHandler(self)
 
         # API connection tracking
         self.subscribed_connections: List[APIConnection] = []

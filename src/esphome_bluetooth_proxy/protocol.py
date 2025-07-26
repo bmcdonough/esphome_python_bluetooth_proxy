@@ -41,6 +41,8 @@ class MessageType(IntEnum):
     BLUETOOTH_GATT_NOTIFY_REQUEST = 34
     BLUETOOTH_GATT_NOTIFY_RESPONSE = 35
     BLUETOOTH_GATT_NOTIFY_DATA_RESPONSE = 36
+    BLUETOOTH_GATT_READ_DESCRIPTOR_REQUEST = 37
+    BLUETOOTH_GATT_WRITE_DESCRIPTOR_REQUEST = 38
 
 
 @dataclass
@@ -251,6 +253,23 @@ class BluetoothGATTNotifyResponse:
 @dataclass
 class BluetoothGATTNotifyDataResponse:
     """GATT notification data response message."""
+
+    address: int  # 48-bit MAC as uint64
+    handle: int
+    data: bytes
+
+
+@dataclass
+class BluetoothGATTReadDescriptorRequest:
+    """GATT descriptor read request message."""
+
+    address: int  # 48-bit MAC as uint64
+    handle: int
+
+
+@dataclass
+class BluetoothGATTWriteDescriptorRequest:
+    """GATT descriptor write request message."""
 
     address: int  # 48-bit MAC as uint64
     handle: int
@@ -846,6 +865,75 @@ class MessageDecoder:
                 enable_val, consumed = decode_varint(data, offset)
                 msg.enable = bool(enable_val)
                 offset += consumed
+            else:
+                # Skip unknown field
+                if wire_type == 0:  # varint
+                    _, consumed = decode_varint(data, offset)
+                    offset += consumed
+                elif wire_type == 2:  # length-delimited
+                    length, length_size = decode_varint(data, offset)
+                    offset += length_size + length
+                else:
+                    raise ProtocolError(f"Unknown wire type: {wire_type}")
+
+        return msg
+
+    def decode_bluetooth_gatt_read_descriptor_request(
+        self, data: bytes
+    ) -> BluetoothGATTReadDescriptorRequest:
+        """Decode BluetoothGATTReadDescriptorRequest message."""
+        msg = BluetoothGATTReadDescriptorRequest(address=0, handle=0)
+        offset = 0
+
+        while offset < len(data):
+            field_key, key_size = decode_varint(data, offset)
+            offset += key_size
+            field_num = field_key >> 3
+            wire_type = field_key & 0x7
+
+            if field_num == 1 and wire_type == 0:  # address
+                msg.address, consumed = decode_varint(data, offset)
+                offset += consumed
+            elif field_num == 2 and wire_type == 0:  # handle
+                msg.handle, consumed = decode_varint(data, offset)
+                offset += consumed
+            else:
+                # Skip unknown field
+                if wire_type == 0:  # varint
+                    _, consumed = decode_varint(data, offset)
+                    offset += consumed
+                elif wire_type == 2:  # length-delimited
+                    length, length_size = decode_varint(data, offset)
+                    offset += length_size + length
+                else:
+                    raise ProtocolError(f"Unknown wire type: {wire_type}")
+
+        return msg
+
+    def decode_bluetooth_gatt_write_descriptor_request(
+        self, data: bytes
+    ) -> BluetoothGATTWriteDescriptorRequest:
+        """Decode BluetoothGATTWriteDescriptorRequest message."""
+        msg = BluetoothGATTWriteDescriptorRequest(address=0, handle=0, data=b"")
+        offset = 0
+
+        while offset < len(data):
+            field_key, key_size = decode_varint(data, offset)
+            offset += key_size
+            field_num = field_key >> 3
+            wire_type = field_key & 0x7
+
+            if field_num == 1 and wire_type == 0:  # address
+                msg.address, consumed = decode_varint(data, offset)
+                offset += consumed
+            elif field_num == 2 and wire_type == 0:  # handle
+                msg.handle, consumed = decode_varint(data, offset)
+                offset += consumed
+            elif field_num == 3 and wire_type == 2:  # data
+                length, length_size = decode_varint(data, offset)
+                offset += length_size
+                msg.data = data[offset : offset + length]
+                offset += length
             else:
                 # Skip unknown field
                 if wire_type == 0:  # varint

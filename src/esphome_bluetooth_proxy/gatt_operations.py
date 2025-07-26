@@ -138,9 +138,8 @@ class GATTOperationHandler:
                 await self._send_gatt_error(address, handle, "Device not connected")
                 return
 
-            # TODO: Implement descriptor read
-            # For now, return empty data
-            data = b""
+            # Perform descriptor read operation
+            data = await connection.read_descriptor(handle)
 
             # Send response
             await self._send_gatt_read_response(address, handle, data)
@@ -174,9 +173,8 @@ class GATTOperationHandler:
                 await self._send_gatt_error(address, handle, "Device not connected")
                 return
 
-            # TODO: Implement descriptor write
-            # For now, assume success
-            success = True
+            # Perform descriptor write operation
+            success = await connection.write_descriptor(handle, data)
 
             # Send response if required
             if response:
@@ -203,8 +201,7 @@ class GATTOperationHandler:
             enable: Whether to enable or disable notifications
         """
         logger.debug(
-            f"GATT notify request: device={address:012X} handle={handle} "
-            f"enable={enable}"
+            f"GATT notify request: device={address:012X} handle={handle} enable={enable}"
         )
 
         try:
@@ -217,13 +214,30 @@ class GATTOperationHandler:
             # Update subscription state
             if address not in self.notification_subscriptions:
                 self.notification_subscriptions[address] = {}
-
             self.notification_subscriptions[address][handle] = enable
 
-            # TODO: Implement actual notification subscription
-            # For now, just track the state
+            # Handle notification subscription
+            if enable:
+                # Create callback that forwards notifications
+                def notification_callback(data: bytes):
+                    # Schedule the async notification forwarding
+                    asyncio.create_task(
+                        self.handle_notification_data(address, handle, data)
+                    )
+                
+                # Start notifications
+                success = await connection.start_notify(handle, notification_callback)
+                if not success:
+                    await self._send_gatt_error(address, handle, "Failed to enable notifications")
+                    return
+            else:
+                # Stop notifications
+                success = await connection.stop_notify(handle)
+                if not success:
+                    await self._send_gatt_error(address, handle, "Failed to disable notifications")
+                    return
 
-            logger.info(
+            logger.debug(
                 f"Notification {'enabled' if enable else 'disabled'} for "
                 f"device {address:012X} handle {handle}"
             )
@@ -375,8 +389,24 @@ class GATTOperationHandler:
             handle: Characteristic/descriptor handle
             error: Error message
         """
-        # TODO: Implement protobuf message sending
-        logger.error(f"GATT error: device={address:012X} handle={handle} error={error}")
+        try:
+            # Send error as read response with error code
+            response = BluetoothGATTReadResponse(
+                address=address, handle=handle, data=b"", error=1  # Generic error
+            )
+            payload = self.encoder.encode_bluetooth_gatt_read_response(response)
+
+            # Send to all subscribed API connections
+            if self.bluetooth_proxy and self.bluetooth_proxy.api_server:
+                for connection in self.bluetooth_proxy.api_server.connections:
+                    if connection.is_authenticated():
+                        await connection.send_message(
+                            MessageType.BLUETOOTH_GATT_READ_RESPONSE, payload
+                        )
+
+            logger.error(f"GATT error: device={address:012X} handle={handle} error={error}")
+        except Exception as e:
+            logger.error(f"Error sending GATT error response: {e}")
 
     def cleanup_device(self, address: int) -> None:
         """Clean up state for disconnected device.
