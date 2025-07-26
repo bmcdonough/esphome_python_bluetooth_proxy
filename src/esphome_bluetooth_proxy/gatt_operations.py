@@ -10,6 +10,13 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 
 from .ble_connection import BLEConnection
+from .protocol import (
+    BluetoothGATTNotifyDataResponse,
+    BluetoothGATTReadResponse,
+    BluetoothGATTWriteResponse,
+    MessageEncoder,
+    MessageType,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +50,7 @@ class GATTOperationHandler:
         self.notification_subscriptions: Dict[int, Dict[int, bool]] = (
             {}
         )  # address -> {handle -> enabled}
+        self.encoder = MessageEncoder()
 
         logger.debug("GATT operation handler initialized")
 
@@ -280,11 +288,26 @@ class GATTOperationHandler:
             handle: Characteristic handle
             data: Read data
         """
-        # TODO: Implement protobuf message sending
-        logger.debug(
-            f"Sending GATT read response: device={address:012X} handle={handle} "
-            f"data={len(data)} bytes"
-        )
+        try:
+            response = BluetoothGATTReadResponse(
+                address=address, handle=handle, data=data, error=0
+            )
+            payload = self.encoder.encode_bluetooth_gatt_read_response(response)
+
+            # Send to all subscribed API connections
+            if self.bluetooth_proxy and self.bluetooth_proxy.api_server:
+                for connection in self.bluetooth_proxy.api_server.connections:
+                    if connection.is_authenticated():
+                        await connection.send_message(
+                            MessageType.BLUETOOTH_GATT_READ_RESPONSE, payload
+                        )
+
+            logger.debug(
+                f"Sent GATT read response: device={address:012X} handle={handle} "
+                f"data={len(data)} bytes"
+            )
+        except Exception as e:
+            logger.error(f"Error sending GATT read response: {e}")
 
     async def _send_gatt_write_response(self, address: int, handle: int) -> None:
         """Send GATT write response.
@@ -293,10 +316,25 @@ class GATTOperationHandler:
             address: Device address
             handle: Characteristic handle
         """
-        # TODO: Implement protobuf message sending
-        logger.debug(
-            f"Sending GATT write response: device={address:012X} handle={handle}"
-        )
+        try:
+            response = BluetoothGATTWriteResponse(
+                address=address, handle=handle, error=0
+            )
+            payload = self.encoder.encode_bluetooth_gatt_write_response(response)
+
+            # Send to all subscribed API connections
+            if self.bluetooth_proxy and self.bluetooth_proxy.api_server:
+                for connection in self.bluetooth_proxy.api_server.connections:
+                    if connection.is_authenticated():
+                        await connection.send_message(
+                            MessageType.BLUETOOTH_GATT_WRITE_RESPONSE, payload
+                        )
+
+            logger.debug(
+                f"Sent GATT write response: device={address:012X} handle={handle}"
+            )
+        except Exception as e:
+            logger.error(f"Error sending GATT write response: {e}")
 
     async def _send_gatt_notification(
         self, address: int, handle: int, data: bytes
@@ -308,11 +346,26 @@ class GATTOperationHandler:
             handle: Characteristic handle
             data: Notification data
         """
-        # TODO: Implement protobuf message sending
-        logger.debug(
-            f"Sending GATT notification: device={address:012X} handle={handle} "
-            f"data={len(data)} bytes"
-        )
+        try:
+            response = BluetoothGATTNotifyDataResponse(
+                address=address, handle=handle, data=data
+            )
+            payload = self.encoder.encode_bluetooth_gatt_notify_data_response(response)
+
+            # Send to all subscribed API connections
+            if self.bluetooth_proxy and self.bluetooth_proxy.api_server:
+                for connection in self.bluetooth_proxy.api_server.connections:
+                    if connection.is_authenticated():
+                        await connection.send_message(
+                            MessageType.BLUETOOTH_GATT_NOTIFY_DATA_RESPONSE, payload
+                        )
+
+            logger.debug(
+                f"Sent GATT notification: device={address:012X} handle={handle} "
+                f"data={len(data)} bytes"
+            )
+        except Exception as e:
+            logger.error(f"Error sending GATT notification: {e}")
 
     async def _send_gatt_error(self, address: int, handle: int, error: str) -> None:
         """Send GATT error response.

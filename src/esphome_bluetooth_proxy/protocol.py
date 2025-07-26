@@ -30,6 +30,17 @@ class MessageType(IntEnum):
     # Bluetooth LE messages
     BLUETOOTH_LE_ADVERTISEMENT_RESPONSE = 24
     BLUETOOTH_LE_RAW_ADVERTISEMENTS_RESPONSE = 25
+    BLUETOOTH_DEVICE_REQUEST = 26
+    BLUETOOTH_DEVICE_CONNECTION_RESPONSE = 27
+    BLUETOOTH_GATT_GET_SERVICES_REQUEST = 28
+    BLUETOOTH_GATT_GET_SERVICES_RESPONSE = 29
+    BLUETOOTH_GATT_READ_REQUEST = 30
+    BLUETOOTH_GATT_READ_RESPONSE = 31
+    BLUETOOTH_GATT_WRITE_REQUEST = 32
+    BLUETOOTH_GATT_WRITE_RESPONSE = 33
+    BLUETOOTH_GATT_NOTIFY_REQUEST = 34
+    BLUETOOTH_GATT_NOTIFY_RESPONSE = 35
+    BLUETOOTH_GATT_NOTIFY_DATA_RESPONSE = 36
 
 
 @dataclass
@@ -121,6 +132,129 @@ class BluetoothLERawAdvertisementsResponse:
     """Batch of BLE advertisements response message."""
 
     advertisements: list  # List of BluetoothLEAdvertisementResponse
+
+
+@dataclass
+class BluetoothDeviceRequest:
+    """Bluetooth device connection request message."""
+
+    address: int  # 48-bit MAC as uint64
+    address_type: int  # 0=Public, 1=Random
+    action: int  # 0=Connect, 1=Disconnect
+
+
+@dataclass
+class BluetoothDeviceConnectionResponse:
+    """Bluetooth device connection response message."""
+
+    address: int  # 48-bit MAC as uint64
+    connected: bool
+    mtu: int = 0
+    error: int = 0  # Error code if connection failed
+
+
+@dataclass
+class BluetoothGATTService:
+    """GATT service information for protocol messages."""
+
+    uuid: bytes  # 16-byte UUID
+    handle: int
+
+
+@dataclass
+class BluetoothGATTCharacteristic:
+    """GATT characteristic information for protocol messages."""
+
+    uuid: bytes  # 16-byte UUID
+    handle: int
+    properties: int  # Read/Write/Notify flags
+
+
+@dataclass
+class BluetoothGATTDescriptor:
+    """GATT descriptor information for protocol messages."""
+
+    uuid: bytes  # 16-byte UUID
+    handle: int
+
+
+@dataclass
+class BluetoothGATTGetServicesRequest:
+    """GATT get services request message."""
+
+    address: int  # 48-bit MAC as uint64
+
+
+@dataclass
+class BluetoothGATTGetServicesResponse:
+    """GATT get services response message."""
+
+    address: int  # 48-bit MAC as uint64
+    services: list  # List of BluetoothGATTService
+
+
+@dataclass
+class BluetoothGATTReadRequest:
+    """GATT characteristic read request message."""
+
+    address: int  # 48-bit MAC as uint64
+    handle: int
+
+
+@dataclass
+class BluetoothGATTReadResponse:
+    """GATT characteristic read response message."""
+
+    address: int  # 48-bit MAC as uint64
+    handle: int
+    data: bytes
+    error: int = 0  # Error code if read failed
+
+
+@dataclass
+class BluetoothGATTWriteRequest:
+    """GATT characteristic write request message."""
+
+    address: int  # 48-bit MAC as uint64
+    handle: int
+    response: bool  # Whether write response is required
+    data: bytes
+
+
+@dataclass
+class BluetoothGATTWriteResponse:
+    """GATT characteristic write response message."""
+
+    address: int  # 48-bit MAC as uint64
+    handle: int
+    error: int = 0  # Error code if write failed
+
+
+@dataclass
+class BluetoothGATTNotifyRequest:
+    """GATT notification subscription request message."""
+
+    address: int  # 48-bit MAC as uint64
+    handle: int
+    enable: bool  # True to enable, False to disable
+
+
+@dataclass
+class BluetoothGATTNotifyResponse:
+    """GATT notification subscription response message."""
+
+    address: int  # 48-bit MAC as uint64
+    handle: int
+    error: int = 0  # Error code if subscription failed
+
+
+@dataclass
+class BluetoothGATTNotifyDataResponse:
+    """GATT notification data response message."""
+
+    address: int  # 48-bit MAC as uint64
+    handle: int
+    data: bytes
 
 
 class ProtocolError(Exception):
@@ -339,6 +473,157 @@ class MessageEncoder:
 
         return bytes(data)
 
+    def encode_bluetooth_device_connection_response(
+        self, msg: BluetoothDeviceConnectionResponse
+    ) -> bytes:
+        """Encode BluetoothDeviceConnectionResponse message."""
+        data = bytearray()
+
+        # Field 1: address (uint64)
+        data.extend(b"\x08")  # Field 1, varint
+        data.extend(encode_varint(msg.address))
+
+        # Field 2: connected (bool)
+        data.extend(b"\x10")  # Field 2, varint
+        data.extend(encode_bool(msg.connected))
+
+        # Field 3: mtu (uint32)
+        if msg.mtu:
+            data.extend(b"\x18")  # Field 3, varint
+            data.extend(encode_varint(msg.mtu))
+
+        # Field 4: error (uint32)
+        if msg.error:
+            data.extend(b"\x20")  # Field 4, varint
+            data.extend(encode_varint(msg.error))
+
+        return bytes(data)
+
+    def encode_bluetooth_gatt_get_services_response(
+        self, msg: BluetoothGATTGetServicesResponse
+    ) -> bytes:
+        """Encode BluetoothGATTGetServicesResponse message."""
+        data = bytearray()
+
+        # Field 1: address (uint64)
+        data.extend(b"\x08")  # Field 1, varint
+        data.extend(encode_varint(msg.address))
+
+        # Field 2: services (repeated BluetoothGATTService)
+        for service in msg.services:
+            data.extend(b"\x12")  # Field 2, length-delimited
+            service_data = self._encode_gatt_service(service)
+            data.extend(encode_varint(len(service_data)))
+            data.extend(service_data)
+
+        return bytes(data)
+
+    def encode_bluetooth_gatt_read_response(
+        self, msg: BluetoothGATTReadResponse
+    ) -> bytes:
+        """Encode BluetoothGATTReadResponse message."""
+        data = bytearray()
+
+        # Field 1: address (uint64)
+        data.extend(b"\x08")  # Field 1, varint
+        data.extend(encode_varint(msg.address))
+
+        # Field 2: handle (uint32)
+        data.extend(b"\x10")  # Field 2, varint
+        data.extend(encode_varint(msg.handle))
+
+        # Field 3: data (bytes)
+        if msg.data:
+            data.extend(b"\x1a")  # Field 3, length-delimited
+            data.extend(encode_varint(len(msg.data)))
+            data.extend(msg.data)
+
+        # Field 4: error (uint32)
+        if msg.error:
+            data.extend(b"\x20")  # Field 4, varint
+            data.extend(encode_varint(msg.error))
+
+        return bytes(data)
+
+    def encode_bluetooth_gatt_write_response(
+        self, msg: BluetoothGATTWriteResponse
+    ) -> bytes:
+        """Encode BluetoothGATTWriteResponse message."""
+        data = bytearray()
+
+        # Field 1: address (uint64)
+        data.extend(b"\x08")  # Field 1, varint
+        data.extend(encode_varint(msg.address))
+
+        # Field 2: handle (uint32)
+        data.extend(b"\x10")  # Field 2, varint
+        data.extend(encode_varint(msg.handle))
+
+        # Field 3: error (uint32)
+        if msg.error:
+            data.extend(b"\x18")  # Field 3, varint
+            data.extend(encode_varint(msg.error))
+
+        return bytes(data)
+
+    def encode_bluetooth_gatt_notify_response(
+        self, msg: BluetoothGATTNotifyResponse
+    ) -> bytes:
+        """Encode BluetoothGATTNotifyResponse message."""
+        data = bytearray()
+
+        # Field 1: address (uint64)
+        data.extend(b"\x08")  # Field 1, varint
+        data.extend(encode_varint(msg.address))
+
+        # Field 2: handle (uint32)
+        data.extend(b"\x10")  # Field 2, varint
+        data.extend(encode_varint(msg.handle))
+
+        # Field 3: error (uint32)
+        if msg.error:
+            data.extend(b"\x18")  # Field 3, varint
+            data.extend(encode_varint(msg.error))
+
+        return bytes(data)
+
+    def encode_bluetooth_gatt_notify_data_response(
+        self, msg: BluetoothGATTNotifyDataResponse
+    ) -> bytes:
+        """Encode BluetoothGATTNotifyDataResponse message."""
+        data = bytearray()
+
+        # Field 1: address (uint64)
+        data.extend(b"\x08")  # Field 1, varint
+        data.extend(encode_varint(msg.address))
+
+        # Field 2: handle (uint32)
+        data.extend(b"\x10")  # Field 2, varint
+        data.extend(encode_varint(msg.handle))
+
+        # Field 3: data (bytes)
+        if msg.data:
+            data.extend(b"\x1a")  # Field 3, length-delimited
+            data.extend(encode_varint(len(msg.data)))
+            data.extend(msg.data)
+
+        return bytes(data)
+
+    def _encode_gatt_service(self, service: BluetoothGATTService) -> bytes:
+        """Encode a single GATT service."""
+        data = bytearray()
+
+        # Field 1: uuid (bytes)
+        data.extend(b"\x0a")  # Field 1, length-delimited
+        data.extend(encode_varint(len(service.uuid)))
+        data.extend(service.uuid)
+
+        # Field 2: handle (uint32)
+        data.extend(b"\x10")  # Field 2, varint
+        data.extend(encode_varint(service.handle))
+
+        return bytes(data)
+
 
 class MessageDecoder:
     """Decodes ESPHome API messages."""
@@ -389,6 +674,177 @@ class MessageDecoder:
 
             if field_num == 1 and wire_type == 2:  # password
                 msg.password, consumed = decode_string(data, offset)
+                offset += consumed
+            else:
+                # Skip unknown field
+                if wire_type == 0:  # varint
+                    _, consumed = decode_varint(data, offset)
+                    offset += consumed
+                elif wire_type == 2:  # length-delimited
+                    length, length_size = decode_varint(data, offset)
+                    offset += length_size + length
+                else:
+                    raise ProtocolError(f"Unknown wire type: {wire_type}")
+
+        return msg
+
+    def decode_bluetooth_device_request(self, data: bytes) -> BluetoothDeviceRequest:
+        """Decode BluetoothDeviceRequest message."""
+        msg = BluetoothDeviceRequest(address=0, address_type=0, action=0)
+        offset = 0
+
+        while offset < len(data):
+            field_key, key_size = decode_varint(data, offset)
+            offset += key_size
+            field_num = field_key >> 3
+            wire_type = field_key & 0x7
+
+            if field_num == 1 and wire_type == 0:  # address
+                msg.address, consumed = decode_varint(data, offset)
+                offset += consumed
+            elif field_num == 2 and wire_type == 0:  # address_type
+                msg.address_type, consumed = decode_varint(data, offset)
+                offset += consumed
+            elif field_num == 3 and wire_type == 0:  # action
+                msg.action, consumed = decode_varint(data, offset)
+                offset += consumed
+            else:
+                # Skip unknown field
+                if wire_type == 0:  # varint
+                    _, consumed = decode_varint(data, offset)
+                    offset += consumed
+                elif wire_type == 2:  # length-delimited
+                    length, length_size = decode_varint(data, offset)
+                    offset += length_size + length
+                else:
+                    raise ProtocolError(f"Unknown wire type: {wire_type}")
+
+        return msg
+
+    def decode_bluetooth_gatt_get_services_request(
+        self, data: bytes
+    ) -> BluetoothGATTGetServicesRequest:
+        """Decode BluetoothGATTGetServicesRequest message."""
+        msg = BluetoothGATTGetServicesRequest(address=0)
+        offset = 0
+
+        while offset < len(data):
+            field_key, key_size = decode_varint(data, offset)
+            offset += key_size
+            field_num = field_key >> 3
+            wire_type = field_key & 0x7
+
+            if field_num == 1 and wire_type == 0:  # address
+                msg.address, consumed = decode_varint(data, offset)
+                offset += consumed
+            else:
+                # Skip unknown field
+                if wire_type == 0:  # varint
+                    _, consumed = decode_varint(data, offset)
+                    offset += consumed
+                elif wire_type == 2:  # length-delimited
+                    length, length_size = decode_varint(data, offset)
+                    offset += length_size + length
+                else:
+                    raise ProtocolError(f"Unknown wire type: {wire_type}")
+
+        return msg
+
+    def decode_bluetooth_gatt_read_request(
+        self, data: bytes
+    ) -> BluetoothGATTReadRequest:
+        """Decode BluetoothGATTReadRequest message."""
+        msg = BluetoothGATTReadRequest(address=0, handle=0)
+        offset = 0
+
+        while offset < len(data):
+            field_key, key_size = decode_varint(data, offset)
+            offset += key_size
+            field_num = field_key >> 3
+            wire_type = field_key & 0x7
+
+            if field_num == 1 and wire_type == 0:  # address
+                msg.address, consumed = decode_varint(data, offset)
+                offset += consumed
+            elif field_num == 2 and wire_type == 0:  # handle
+                msg.handle, consumed = decode_varint(data, offset)
+                offset += consumed
+            else:
+                # Skip unknown field
+                if wire_type == 0:  # varint
+                    _, consumed = decode_varint(data, offset)
+                    offset += consumed
+                elif wire_type == 2:  # length-delimited
+                    length, length_size = decode_varint(data, offset)
+                    offset += length_size + length
+                else:
+                    raise ProtocolError(f"Unknown wire type: {wire_type}")
+
+        return msg
+
+    def decode_bluetooth_gatt_write_request(
+        self, data: bytes
+    ) -> BluetoothGATTWriteRequest:
+        """Decode BluetoothGATTWriteRequest message."""
+        msg = BluetoothGATTWriteRequest(address=0, handle=0, response=True, data=b"")
+        offset = 0
+
+        while offset < len(data):
+            field_key, key_size = decode_varint(data, offset)
+            offset += key_size
+            field_num = field_key >> 3
+            wire_type = field_key & 0x7
+
+            if field_num == 1 and wire_type == 0:  # address
+                msg.address, consumed = decode_varint(data, offset)
+                offset += consumed
+            elif field_num == 2 and wire_type == 0:  # handle
+                msg.handle, consumed = decode_varint(data, offset)
+                offset += consumed
+            elif field_num == 3 and wire_type == 0:  # response
+                response_val, consumed = decode_varint(data, offset)
+                msg.response = bool(response_val)
+                offset += consumed
+            elif field_num == 4 and wire_type == 2:  # data
+                length, length_size = decode_varint(data, offset)
+                offset += length_size
+                msg.data = data[offset : offset + length]
+                offset += length
+            else:
+                # Skip unknown field
+                if wire_type == 0:  # varint
+                    _, consumed = decode_varint(data, offset)
+                    offset += consumed
+                elif wire_type == 2:  # length-delimited
+                    length, length_size = decode_varint(data, offset)
+                    offset += length_size + length
+                else:
+                    raise ProtocolError(f"Unknown wire type: {wire_type}")
+
+        return msg
+
+    def decode_bluetooth_gatt_notify_request(
+        self, data: bytes
+    ) -> BluetoothGATTNotifyRequest:
+        """Decode BluetoothGATTNotifyRequest message."""
+        msg = BluetoothGATTNotifyRequest(address=0, handle=0, enable=False)
+        offset = 0
+
+        while offset < len(data):
+            field_key, key_size = decode_varint(data, offset)
+            offset += key_size
+            field_num = field_key >> 3
+            wire_type = field_key & 0x7
+
+            if field_num == 1 and wire_type == 0:  # address
+                msg.address, consumed = decode_varint(data, offset)
+                offset += consumed
+            elif field_num == 2 and wire_type == 0:  # handle
+                msg.handle, consumed = decode_varint(data, offset)
+                offset += consumed
+            elif field_num == 3 and wire_type == 0:  # enable
+                enable_val, consumed = decode_varint(data, offset)
+                msg.enable = bool(enable_val)
                 offset += consumed
             else:
                 # Skip unknown field

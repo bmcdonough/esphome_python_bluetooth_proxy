@@ -11,6 +11,9 @@ from enum import IntEnum
 from typing import Callable, Optional
 
 from .protocol import (
+    BluetoothDeviceConnectionResponse,
+    BluetoothGATTGetServicesResponse,
+    BluetoothGATTService,
     BluetoothLEAdvertisementResponse,
     BluetoothLERawAdvertisementsResponse,
     ConnectResponse,
@@ -143,9 +146,19 @@ class APIConnection:
                 await self._handle_list_entities_request(payload)
             elif msg_type == MessageType.PING_REQUEST:
                 await self._handle_ping_request()
+            elif msg_type == MessageType.BLUETOOTH_DEVICE_REQUEST:
+                await self._handle_bluetooth_device_request(payload)
+            elif msg_type == MessageType.BLUETOOTH_GATT_GET_SERVICES_REQUEST:
+                await self._handle_bluetooth_gatt_get_services_request(payload)
+            elif msg_type == MessageType.BLUETOOTH_GATT_READ_REQUEST:
+                await self._handle_bluetooth_gatt_read_request(payload)
+            elif msg_type == MessageType.BLUETOOTH_GATT_WRITE_REQUEST:
+                await self._handle_bluetooth_gatt_write_request(payload)
+            elif msg_type == MessageType.BLUETOOTH_GATT_NOTIFY_REQUEST:
+                await self._handle_bluetooth_gatt_notify_request(payload)
             else:
                 logger.warning(
-                    f"Unhandled message type {msg_type} from {self.client_address}"
+                    f"Unknown message type {msg_type} from {self.client_address}"
                 )
 
         except Exception as e:
@@ -351,12 +364,177 @@ class APIConnection:
     async def _handle_ping_request(self) -> None:
         """Handle PingRequest message."""
         try:
-            # Send empty PingResponse
+            # Send ping response (empty payload)
             await self._send_message(MessageType.PING_RESPONSE, b"")
+
             logger.debug(f"Sent ping response to {self.client_address}")
 
         except Exception as e:
             logger.error(f"Error handling PingRequest from {self.client_address}: {e}")
+
+    async def _handle_bluetooth_device_request(self, payload: bytes) -> None:
+        """Handle BluetoothDeviceRequest message."""
+        try:
+            request = self.decoder.decode_bluetooth_device_request(payload)
+            logger.debug(
+                f"Bluetooth device request from {self.client_address}: "
+                f"address={request.address:012X} action={request.action}"
+            )
+
+            # Forward to Bluetooth proxy if available
+            if hasattr(self, "bluetooth_proxy") and self.bluetooth_proxy:
+                if request.action == 0:  # Connect
+                    success = await self.bluetooth_proxy.connect_device(
+                        request.address, request.address_type
+                    )
+                elif request.action == 1:  # Disconnect
+                    success = await self.bluetooth_proxy.disconnect_device(
+                        request.address
+                    )
+                else:
+                    logger.warning(f"Unknown device action: {request.action}")
+                    success = False
+
+                # Send response (connection state will be sent separately)
+                if not success:
+                    response = BluetoothDeviceConnectionResponse(
+                        address=request.address,
+                        connected=False,
+                        error=1,  # Generic error
+                    )
+                    payload = self.encoder.encode_bluetooth_device_connection_response(
+                        response
+                    )
+                    await self._send_message(
+                        MessageType.BLUETOOTH_DEVICE_CONNECTION_RESPONSE, payload
+                    )
+            else:
+                logger.warning("No Bluetooth proxy available for device request")
+
+        except Exception as e:
+            logger.error(f"Error handling Bluetooth device request: {e}")
+
+    async def _handle_bluetooth_gatt_get_services_request(self, payload: bytes) -> None:
+        """Handle BluetoothGATTGetServicesRequest message."""
+        try:
+            request = self.decoder.decode_bluetooth_gatt_get_services_request(payload)
+            logger.debug(
+                f"GATT get services request from {self.client_address}: "
+                f"address={request.address:012X}"
+            )
+
+            # Forward to Bluetooth proxy if available
+            if hasattr(self, "bluetooth_proxy") and self.bluetooth_proxy:
+                connection = self.bluetooth_proxy.connections.get(request.address)
+                if connection and connection.is_connected():
+                    try:
+                        # Discover services
+                        services = await connection.discover_services()
+
+                        # Convert to protocol format
+                        protocol_services = []
+                        for service in services:
+                            protocol_service = BluetoothGATTService(
+                                uuid=service.uuid, handle=service.handle
+                            )
+                            protocol_services.append(protocol_service)
+
+                        # Send response
+                        response = BluetoothGATTGetServicesResponse(
+                            address=request.address, services=protocol_services
+                        )
+                        payload = (
+                            self.encoder.encode_bluetooth_gatt_get_services_response(
+                                response
+                            )
+                        )
+                        await self._send_message(
+                            MessageType.BLUETOOTH_GATT_GET_SERVICES_RESPONSE, payload
+                        )
+
+                    except Exception as e:
+                        logger.error(f"Service discovery failed: {e}")
+                        # Send empty response on error
+                        response = BluetoothGATTGetServicesResponse(
+                            address=request.address, services=[]
+                        )
+                        payload = (
+                            self.encoder.encode_bluetooth_gatt_get_services_response(
+                                response
+                            )
+                        )
+                        await self._send_message(
+                            MessageType.BLUETOOTH_GATT_GET_SERVICES_RESPONSE, payload
+                        )
+                else:
+                    logger.warning(f"Device {request.address:012X} not connected")
+            else:
+                logger.warning("No Bluetooth proxy available for GATT services request")
+
+        except Exception as e:
+            logger.error(f"Error handling GATT get services request: {e}")
+
+    async def _handle_bluetooth_gatt_read_request(self, payload: bytes) -> None:
+        """Handle BluetoothGATTReadRequest message."""
+        try:
+            request = self.decoder.decode_bluetooth_gatt_read_request(payload)
+            logger.debug(
+                f"GATT read request from {self.client_address}: "
+                f"address={request.address:012X} handle={request.handle}"
+            )
+
+            # Forward to GATT operations handler if available
+            if hasattr(self, "gatt_handler") and self.gatt_handler:
+                await self.gatt_handler.handle_gatt_read_request(
+                    request.address, request.handle
+                )
+            else:
+                logger.warning("No GATT handler available for read request")
+
+        except Exception as e:
+            logger.error(f"Error handling GATT read request: {e}")
+
+    async def _handle_bluetooth_gatt_write_request(self, payload: bytes) -> None:
+        """Handle BluetoothGATTWriteRequest message."""
+        try:
+            request = self.decoder.decode_bluetooth_gatt_write_request(payload)
+            logger.debug(
+                f"GATT write request from {self.client_address}: "
+                f"address={request.address:012X} handle={request.handle} "
+                f"data={len(request.data)} bytes response={request.response}"
+            )
+
+            # Forward to GATT operations handler if available
+            if hasattr(self, "gatt_handler") and self.gatt_handler:
+                await self.gatt_handler.handle_gatt_write_request(
+                    request.address, request.handle, request.data, request.response
+                )
+            else:
+                logger.warning("No GATT handler available for write request")
+
+        except Exception as e:
+            logger.error(f"Error handling GATT write request: {e}")
+
+    async def _handle_bluetooth_gatt_notify_request(self, payload: bytes) -> None:
+        """Handle BluetoothGATTNotifyRequest message."""
+        try:
+            request = self.decoder.decode_bluetooth_gatt_notify_request(payload)
+            logger.debug(
+                f"GATT notify request from {self.client_address}: "
+                f"address={request.address:012X} handle={request.handle} "
+                f"enable={request.enable}"
+            )
+
+            # Forward to GATT operations handler if available
+            if hasattr(self, "gatt_handler") and self.gatt_handler:
+                await self.gatt_handler.handle_gatt_notify_request(
+                    request.address, request.handle, request.enable
+                )
+            else:
+                logger.warning("No GATT handler available for notify request")
+
+        except Exception as e:
+            logger.error(f"Error handling GATT notify request: {e}")
 
     async def _send_message(self, msg_type: int, payload: bytes) -> None:
         """Send a message to the client."""
