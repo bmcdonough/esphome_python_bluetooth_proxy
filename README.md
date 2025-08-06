@@ -15,9 +15,11 @@ This project aims to provide a Python alternative to the existing C++ ESPHome Bl
 
 - Bluetooth Low Energy (BLE) device discovery and communication
 - Integration with ESPHome API
+- Passive BLE scanning with advertisement forwarding
+- Active BLE connections with GATT operations support
 - Asynchronous operation for better performance
 - Comprehensive logging and error handling
-- Configurable via YAML files
+- Configurable via command-line arguments
 
 ## Requirements
 
@@ -64,7 +66,55 @@ pip install esphome-python-bluetooth-proxy
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development setup instructions.
 
-## Quick Start
+## Production Daemon
+
+The project includes a production-ready daemon script that can be used for real-world testing and deployment:
+
+### Running the Daemon
+
+```bash
+# Basic usage (listens on all interfaces, port 6053)
+python3 esphome_bluetooth_proxy_daemon.py
+
+# With custom host and port
+python3 esphome_bluetooth_proxy_daemon.py --host 192.168.1.10 --port 6054
+
+# With API password
+python3 esphome_bluetooth_proxy_daemon.py --password your_secret_password
+
+# With logging to file
+python3 esphome_bluetooth_proxy_daemon.py --log-file /var/log/bluetooth_proxy.log
+
+# Passive scanning only (no active connections)
+python3 esphome_bluetooth_proxy_daemon.py --no-active-connections
+```
+
+### Command-Line Arguments
+
+| Argument | Description | Default |
+|----------|-------------|--------|
+| `--host` | Host address to bind to | `0.0.0.0` (all interfaces) |
+| `--port` | Port to listen on | `6053` |
+| `--name` | Device name used for ESPHome API | `python-bluetooth-proxy` |
+| `--friendly-name` | User-friendly device name | `Python Bluetooth Proxy` |
+| `--password` | API password | `None` (no password) |
+| `--log-level` | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) | `INFO` |
+| `--log-file` | Log file path | `None` (logs to stdout) |
+| `--no-active-connections` | Disable active BLE connections (passive scanning only) | `False` |
+| `--max-connections` | Maximum concurrent BLE connections | `3` |
+| `--batch-size` | Advertisement batch size | `16` |
+
+### Home Assistant Integration
+
+1. Run the daemon on a machine with Bluetooth capabilities
+2. In Home Assistant, add a new ESPHome device:
+   - Go to Settings → Devices & Services → Add Integration
+   - Select ESPHome
+   - Enter the IP address of the machine running the daemon
+   - Enter the port (default: 6053)
+   - Enter the API password if configured
+
+## Quick Start (Library Usage)
 
 ```python
 from esphome_bluetooth_proxy import BluetoothProxy
@@ -76,28 +126,18 @@ proxy = BluetoothProxy()
 await proxy.start()
 ```
 
-## Configuration
-
-Create a `config.yaml` file:
-
-```yaml
-esphome:
-  host: "192.168.1.100"
-  port: 6053
-  password: "your_api_password"
-
-bluetooth:
-  scan_interval: 30
-  devices:
-    - name: "Temperature Sensor"
-      mac: "AA:BB:CC:DD:EE:FF"
-```
-
 ## Development Status
 
-🚧 **This project is currently in early development** 🚧
+🚧 **This project is in active development** 🚧
 
 - [x] Project structure and tooling setup
+- [x] Phase 1: ESPHome API server foundation
+- [x] Phase 2: Complete Home Assistant integration
+- [x] Phase 3: Passive BLE scanning
+- [x] Phase 4: Active BLE connections
+- [x] Phase 5: GATT operations
+- [ ] Phase 6: Advanced features (pairing, cache management)
+- [ ] Phase 7: Optimization and production readiness
 - [ ] Core Bluetooth functionality
 - [ ] ESPHome API integration
 - [ ] Configuration management
