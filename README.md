@@ -64,9 +64,99 @@ pip install esphome-python-bluetooth-proxy
 
 ### For Development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development setup instructions.
+Clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/bmcdonough/esphome_python_bluetooth_proxy.git
+cd esphome_python_bluetooth_proxy
+pip install -e .
+```
 
 ## Production Daemon
+
+The project includes a production-ready daemon script that provides a comprehensive implementation of the ESPHome Bluetooth Proxy API. This daemon supports command-line arguments, proper logging, and listening on all network interfaces.
+
+### Running the Daemon
+
+You can run the daemon directly:
+
+```bash
+python3 esphome_bluetooth_proxy_daemon.py --log-level INFO
+```
+
+### Command Line Arguments
+
+The daemon supports the following command-line arguments:
+
+| Argument | Description | Default |
+|----------|-------------|----------|
+| `--host` | Hostname/IP to listen on | `0.0.0.0` (all interfaces) |
+| `--port` | Port to listen on | `6053` |
+| `--name` | Device name | `python-bluetooth-proxy` |
+| `--friendly-name` | Friendly device name | `Python Bluetooth Proxy` |
+| `--password` | API password (optional) | `None` (no password) |
+| `--active-connections` | Enable active BLE connections | `True` |
+| `--no-active-connections` | Disable active BLE connections | |
+| `--max-connections` | Maximum concurrent BLE connections | `3` |
+| `--advertisement-batch-size` | Number of advertisements to batch | `20` |
+| `--log-level` | Logging level (DEBUG, INFO, WARNING, ERROR) | `INFO` |
+| `--log-file` | Path to log file (optional) | `None` (console only) |
+| `--log-max-size` | Maximum log file size in MB | `10` |
+| `--log-backup-count` | Number of log backups to keep | `3` |
+
+### Integration with Home Assistant
+
+To add the Python Bluetooth Proxy to Home Assistant:
+
+1. Start the daemon on your server
+2. In Home Assistant, go to **Settings** > **Devices & Services**
+3. Click **+ Add Integration**
+4. Search for and select **ESPHome**
+5. Enter the IP address of your server and port 6053
+6. If you set a password, enter it when prompted
+7. The device will be added as a Bluetooth proxy
+
+## Systemd Service
+
+For production use, you can set up the daemon to run as a systemd service:
+
+1. Copy the provided service file to the systemd directory:
+
+```bash
+sudo cp esphome-bluetooth-proxy.service /etc/systemd/system/
+```
+
+2. Edit the service file to match your installation path:
+
+```bash
+sudo nano /etc/systemd/system/esphome-bluetooth-proxy.service
+```
+
+3. Enable and start the service:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable esphome-bluetooth-proxy
+sudo systemctl start esphome-bluetooth-proxy
+```
+
+4. Check the service status:
+
+```bash
+sudo systemctl status esphome-bluetooth-proxy
+```
+
+5. View the logs:
+
+```bash
+sudo journalctl -u esphome-bluetooth-proxy -f
+```
+
+### Customizing the Service
+
+The default service configuration runs the daemon as root (required for BLE access) and logs to `/var/log/esphome-bluetooth-proxy.log`. You can modify the service file to change these settings before installing.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development setup instructions.
 
 The project includes a production-ready daemon script that can be used for real-world testing and deployment:
 

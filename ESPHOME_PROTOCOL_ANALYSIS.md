@@ -242,9 +242,29 @@ BluetoothGATTNotifyRequest {
 
 After the initial handshake, the connection maintains several types of ongoing communication:
 
+### State Subscription (Message Type 20)
+```protobuf
+// Client → Server
+SubscribeStatesRequest {
+  // Empty message with type ID 20
+  option (id) = 20;
+  option (source) = SOURCE_CLIENT;
+}
+```
+
+**What happens:**
+- Home Assistant sends this empty message to subscribe to all entity state changes
+- Upon receiving this message, the ESPHome device should:
+  1. Acknowledge the subscription request
+  2. Begin sending state updates whenever entity states change
+  3. Trigger an initial state iterator that sends current states of all entities
+- No response message is sent; instead, the device immediately begins streaming state messages
+- This is a critical message for maintaining real-time state synchronization
+
 ### State Updates
-- Real-time entity state changes are pushed to Home Assistant
+- Real-time entity state changes are pushed to Home Assistant after SubscribeStatesRequest
 - Each state update includes the entity key and new value
+- Initial states are sent immediately after subscription
 
 ### Command Handling
 - Home Assistant sends control commands for entities
