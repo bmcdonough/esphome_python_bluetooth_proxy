@@ -332,15 +332,16 @@ class APIConnection:
             logger.debug(f"Sending ping response to {self.client_address}")
             await self._send_message(MessageType.PING_RESPONSE, b"")
             logger.debug(f"Sent ping response to {self.client_address}")
-            
+
         except Exception as e:
             logger.error(f"Error handling PingRequest from {self.client_address}: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
-            
+
     async def _handle_list_entities_request(self, payload: bytes) -> None:
         """Handle ListEntitiesRequest message.
-        
+
         This message requests a list of entities exposed by the device.
         For the Bluetooth proxy, we have no entities to report, so we just send
         a ListEntitiesDoneResponse to complete the sequence.
@@ -350,24 +351,27 @@ class APIConnection:
             logger.info(
                 f"Client {self.client_address} requested entity list (none to report)"
             )
-            
+
             # Send list entities done response (no entities to report)
             done_response = ListEntitiesDoneResponse()
-            done_payload = self.encoder.encode_list_entities_done_response(done_response)
+            done_payload = self.encoder.encode_list_entities_done_response(
+                done_response
+            )
             await self.send_message(
                 MessageType.LIST_ENTITIES_DONE_RESPONSE, done_payload
             )
-            
+
         except Exception as e:
             logger.error(
                 f"Error handling ListEntitiesRequest from {self.client_address}: {e}"
             )
             import traceback
+
             logger.error(traceback.format_exc())
-    
+
     async def _handle_subscribe_states_request(self, payload: bytes) -> None:
         """Handle SubscribeStatesRequest message.
-        
+
         This message indicates the client wants to subscribe to state updates.
         Upon receiving this message, we should:
         1. Mark the connection as subscribed to state updates
@@ -377,25 +381,24 @@ class APIConnection:
         try:
             # Decode request
             request = self.decoder.decode_subscribe_states_request(payload)
-            
-            logger.info(
-                f"Client {self.client_address} subscribed to state updates"
-            )
-            
+
+            logger.info(f"Client {self.client_address} subscribed to state updates")
+
             # Mark connection as subscribed
             self.subscribed_to_states = True
-            
+
             # Send initial states
             # For Bluetooth proxy, we only need to send scanner state
             await self._send_bluetooth_scanner_state()
-            
+
             logger.info(f"Sent initial state updates to {self.client_address}")
-            
+
         except Exception as e:
             logger.error(
                 f"Error handling SubscribeStatesRequest from {self.client_address}: {e}"
             )
             import traceback
+
             logger.error(traceback.format_exc())
 
     async def _handle_bluetooth_device_request(self, payload: bytes) -> None:
@@ -719,12 +722,12 @@ class APIConnection:
 
     async def _send_bluetooth_scanner_state(self) -> None:
         """Send current Bluetooth scanner state to client.
-        
+
         This is called on initial subscription and whenever the scanner state changes.
         """
         if not self.subscribed_to_states:
             return
-            
+
         try:
             # Create state response with current scanner state
             # For now using default values - in a full implementation, this would
@@ -732,18 +735,22 @@ class APIConnection:
             scanner_state = BluetoothScannerStateResponse(
                 active=True,  # Bluetooth proxy is active
                 scanning=True,  # Currently scanning
-                mode=1,        # BLE mode
+                mode=1,  # BLE mode
             )
-            
+
             # Encode and send
-            payload = self.encoder.encode_bluetooth_scanner_state_response(scanner_state)
-            await self.send_message(MessageType.BLUETOOTH_SCANNER_STATE_RESPONSE, payload)
-            
+            payload = self.encoder.encode_bluetooth_scanner_state_response(
+                scanner_state
+            )
+            await self.send_message(
+                MessageType.BLUETOOTH_SCANNER_STATE_RESPONSE, payload
+            )
+
             logger.debug(f"Sent Bluetooth scanner state to {self.client_address}")
-            
+
         except Exception as e:
             logger.error(f"Error sending Bluetooth scanner state: {e}")
-    
+
     def __str__(self) -> str:
         """String representation of the connection."""
         return (

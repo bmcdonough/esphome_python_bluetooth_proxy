@@ -258,21 +258,27 @@ class BluetoothProxy:
         # Only send state if the connection is subscribed to states
         if not api_connection.subscribed_to_states:
             return
-            
+
         try:
             # Create scanner state response message
             scanner_state = BluetoothScannerStateResponse(
-                active=self.active,                     # Whether active connections are enabled
-                scanning=self.scanner.is_scanning() if self.scanner else False,  # Current scanning state
-                mode=1 if self.scanner and self.scanner.get_scan_mode() else 0,  # 0=Classic, 1=BLE
+                active=self.active,  # Whether active connections are enabled
+                scanning=(
+                    self.scanner.is_scanning() if self.scanner else False
+                ),  # Current scanning state
+                mode=(
+                    1 if self.scanner and self.scanner.get_scan_mode() else 0
+                ),  # 0=Classic, 1=BLE
             )
-            
+
             # Send scanner state response
             await api_connection.send_message(
                 MessageType.BLUETOOTH_SCANNER_STATE_RESPONSE,
-                api_connection.encoder.encode_bluetooth_scanner_state_response(scanner_state)
+                api_connection.encoder.encode_bluetooth_scanner_state_response(
+                    scanner_state
+                ),
             )
-            
+
             logger.debug(
                 f"Sent scanner state to {api_connection}: "
                 f"active={scanner_state.active}, "
@@ -399,7 +405,7 @@ class BluetoothProxy:
             self.active = active
             self.api_server.set_active_connections(active)
             logger.info(f"Active connections {'enabled' if active else 'disabled'}")
-            
+
             # Notify all subscribed connections about state change
             asyncio.create_task(self._notify_scanner_state_change())
 
@@ -420,7 +426,7 @@ class BluetoothProxy:
         if self.scanner:
             self.scanner.set_scan_mode(active)
             logger.info(f"Scanner mode set to {'active' if active else 'passive'}")
-            
+
             # Notify all subscribed connections about state change
             await self._notify_scanner_state_change()
 
@@ -430,11 +436,13 @@ class BluetoothProxy:
         for api_connection in self.subscribed_connections:
             if api_connection.subscribed_to_states:
                 tasks.append(self._send_scanner_state(api_connection))
-                
+
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
-            logger.debug(f"Notified {len(tasks)} connections about scanner state change")
-    
+            logger.debug(
+                f"Notified {len(tasks)} connections about scanner state change"
+            )
+
     def get_stats(self) -> dict:
         """Get Bluetooth proxy statistics.
 

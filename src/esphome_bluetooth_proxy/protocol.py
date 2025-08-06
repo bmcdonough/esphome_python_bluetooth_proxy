@@ -124,8 +124,8 @@ class ListEntitiesDoneResponse:
 @dataclass
 class SubscribeStatesRequest:
     """Subscribe to state updates request message from client.
-    
-    This is an empty message that triggers initial state updates and 
+
+    This is an empty message that triggers initial state updates and
     ongoing state update streaming.
     """
 
@@ -135,7 +135,7 @@ class SubscribeStatesRequest:
 @dataclass
 class BluetoothScannerStateResponse:
     """Bluetooth scanner state response message to client.
-    
+
     Sent when the Bluetooth scanner state changes or as part of initial state updates.
     """
 
@@ -588,7 +588,7 @@ class MessageEncoder:
             data.extend(encode_varint(msg.error))
 
         return bytes(data)
-        
+
     def encode_bluetooth_scanner_state_response(
         self, msg: BluetoothScannerStateResponse
     ) -> bytes:
@@ -598,15 +598,15 @@ class MessageEncoder:
         # Field 1: active (bool)
         data.extend(b"\x08")  # Field 1, varint
         data.extend(encode_bool(msg.active))
-        
+
         # Field 2: scanning (bool)
         data.extend(b"\x10")  # Field 2, varint
         data.extend(encode_bool(msg.scanning))
-        
+
         # Field 3: mode (uint32) - 0=Classic, 1=BLE, 2=Dual Mode
         data.extend(b"\x18")  # Field 3, varint
         data.extend(encode_varint(msg.mode))
-        
+
         return bytes(data)
 
     def encode_bluetooth_gatt_write_response(
@@ -991,21 +991,21 @@ class MessageDecoder:
                     raise ProtocolError(f"Unknown wire type: {wire_type}")
 
         return msg
-        
+
     def decode_subscribe_states_request(self, data: bytes) -> SubscribeStatesRequest:
         """Decode SubscribeStatesRequest message.
-        
+
         This is an empty message with no fields to decode.
         """
         msg = SubscribeStatesRequest()
         offset = 0
-        
+
         # Skip any unexpected fields (future compatibility)
         while offset < len(data):
             field_key, key_size = decode_varint(data, offset)
             offset += key_size
             wire_type = field_key & 0x7
-            
+
             # Skip unknown field
             if wire_type == 0:  # varint
                 _, consumed = decode_varint(data, offset)
@@ -1015,7 +1015,7 @@ class MessageDecoder:
                 offset += length_size + length
             else:
                 raise ProtocolError(f"Unknown wire type: {wire_type}")
-                
+
         return msg
 
 
