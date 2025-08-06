@@ -21,11 +21,11 @@ from .protocol import (
     DeviceInfoResponse,
     HelloResponse,
     ListEntitiesDoneResponse,
-    SubscribeStatesRequest,
     MessageDecoder,
     MessageEncoder,
     MessageType,
     ProtocolError,
+    SubscribeStatesRequest,
     create_message_frame,
     parse_message_frame,
 )
