@@ -167,6 +167,26 @@ class AdvertisementBatcher:
         if batch_size > 0:
             logger.debug(f"Cleared advertisement batch ({batch_size} advertisements)")
 
+    def start(self) -> None:
+        """No-op start method for API compatibility.
+        
+        This method is called by bluetooth_proxy.py when starting BLE scanning,
+        but the AdvertisementBatcher doesn't need explicit start/stop handling.
+        """
+        logger.debug("AdvertisementBatcher.start() called (no-op)")
+        pass
+        
+    def stop(self) -> None:
+        """No-op stop method for API compatibility.
+        
+        This method is called by bluetooth_proxy.py when stopping BLE scanning,
+        but the AdvertisementBatcher doesn't need explicit start/stop handling.
+        """
+        logger.debug("AdvertisementBatcher.stop() called (no-op)")
+        # Force flush any remaining advertisements when stopping
+        self.force_flush()
+        pass
+        
     def get_stats(self) -> dict:
         """Get batching statistics.
 
