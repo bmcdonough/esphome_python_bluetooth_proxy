@@ -331,10 +331,40 @@ class APIConnection:
             # Empty PingResponse
             logger.debug(f"Sending ping response to {self.client_address}")
             await self._send_message(MessageType.PING_RESPONSE, b"")
-
+            logger.debug(f"Sent ping response to {self.client_address}")
+            
         except Exception as e:
             logger.error(f"Error handling PingRequest from {self.client_address}: {e}")
-
+            import traceback
+            logger.error(traceback.format_exc())
+            
+    async def _handle_list_entities_request(self, payload: bytes) -> None:
+        """Handle ListEntitiesRequest message.
+        
+        This message requests a list of entities exposed by the device.
+        For the Bluetooth proxy, we have no entities to report, so we just send
+        a ListEntitiesDoneResponse to complete the sequence.
+        """
+        try:
+            # No need to decode the request as it has no fields
+            logger.info(
+                f"Client {self.client_address} requested entity list (none to report)"
+            )
+            
+            # Send list entities done response (no entities to report)
+            done_response = ListEntitiesDoneResponse()
+            done_payload = self.encoder.encode_list_entities_done_response(done_response)
+            await self.send_message(
+                MessageType.LIST_ENTITIES_DONE_RESPONSE, done_payload
+            )
+            
+        except Exception as e:
+            logger.error(
+                f"Error handling ListEntitiesRequest from {self.client_address}: {e}"
+            )
+            import traceback
+            logger.error(traceback.format_exc())
+    
     async def _handle_subscribe_states_request(self, payload: bytes) -> None:
         """Handle SubscribeStatesRequest message.
         
@@ -344,29 +374,20 @@ class APIConnection:
         2. Send initial state updates for all entities
         3. Continue sending state updates whenever entity states change
         """
-        logger.info(f"Received SubscribeStatesRequest from {self.client_address}")
-        
-        if self.state != ConnectionState.AUTHENTICATED:
-            logger.warning(
-                f"SubscribeStatesRequest from unauthenticated client "
-                f"{self.client_address} in state {self.state}"
-            )
-            return
-            
         try:
-            # Decode the message (though it's empty)
-            self.decoder.decode_subscribe_states_request(payload)
+            # Decode request
+            request = self.decoder.decode_subscribe_states_request(payload)
             
-            # Mark this connection as subscribed to states
+            logger.info(
+                f"Client {self.client_address} subscribed to state updates"
+            )
+            
+            # Mark connection as subscribed
             self.subscribed_to_states = True
-            logger.info(f"Client {self.client_address} subscribed to state updates")
             
-            # Send initial state updates - for Bluetooth proxy, this includes:
-            # 1. Current Bluetooth scanner state
+            # Send initial states
+            # For Bluetooth proxy, we only need to send scanner state
             await self._send_bluetooth_scanner_state()
-            
-            # 2. TODO: Add other state information if needed in future updates
-            # (e.g., connected devices list, etc.)
             
             logger.info(f"Sent initial state updates to {self.client_address}")
             
@@ -374,6 +395,8 @@ class APIConnection:
             logger.error(
                 f"Error handling SubscribeStatesRequest from {self.client_address}: {e}"
             )
+            import traceback
+            logger.error(traceback.format_exc())
 
     async def _handle_bluetooth_device_request(self, payload: bytes) -> None:
         """Handle BluetoothDeviceRequest message."""
