@@ -18,15 +18,14 @@ import logging
 import os
 import signal
 import sys
-from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-# Add src to path for imports
+# Configure system path before imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from esphome_bluetooth_proxy.api_server import ESPHomeAPIServer
-from esphome_bluetooth_proxy.bluetooth_proxy import BluetoothProxy
+# Import after path configuration
+from esphome_bluetooth_proxy.api_server import ESPHomeAPIServer  # noqa: E402
 
 
 class ESPHomeBluetoothProxyDaemon:
@@ -124,7 +123,8 @@ class ESPHomeBluetoothProxyDaemon:
             f"Device name: {self.name}, Friendly name: {self.friendly_name}"
         )
         self.logger.info(
-            f"Active connections: {self.active_connections}, Max connections: {self.max_connections}"
+            f"Active connections: {self.active_connections}, "
+            f"Max connections: {self.max_connections}"
         )
         self.logger.info(f"Log level: {self.log_level}")
         if self.log_file:
@@ -156,7 +156,8 @@ class ESPHomeBluetoothProxyDaemon:
                 f"ESPHome API server started successfully on {self.host}:{self.port}"
             )
             self.logger.info(
-                f"Bluetooth proxy initialized with {self.max_connections} max connections"
+                f"Bluetooth proxy initialized with "
+                f"{self.max_connections} max connections"
             )
 
             # Verify GATT handler integration

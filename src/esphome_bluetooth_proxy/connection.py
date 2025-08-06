@@ -25,7 +25,6 @@ from .protocol import (
     MessageEncoder,
     MessageType,
     ProtocolError,
-    SubscribeStatesRequest,
     create_message_frame,
     parse_message_frame,
 )
@@ -379,8 +378,8 @@ class APIConnection:
         3. Continue sending state updates whenever entity states change
         """
         try:
-            # Decode request
-            request = self.decoder.decode_subscribe_states_request(payload)
+            # Decode request (not used, but decode for validation)
+            _ = self.decoder.decode_subscribe_states_request(payload)
 
             logger.info(f"Client {self.client_address} subscribed to state updates")
 

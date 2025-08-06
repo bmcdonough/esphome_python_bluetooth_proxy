@@ -170,8 +170,8 @@ class AdvertisementBatcher:
     def start(self) -> None:
         """No-op start method for API compatibility.
 
-        This method is called by bluetooth_proxy.py when starting BLE scanning,
-        but the AdvertisementBatcher doesn't need explicit start/stop handling.
+        This method is called by bluetooth_proxy.py when starting BLE scanning.
+        The batcher is automatically started upon initialization, so this is a no-op.
         """
         logger.debug("AdvertisementBatcher.start() called (no-op)")
         pass
@@ -201,12 +201,5 @@ class AdvertisementBatcher:
             "last_flush_time": self.last_flush_time,
             "timer_active": self.flush_timer is not None,
         }
-
-    def start(self) -> None:
-        """Start the advertisement batcher.
-
-        This method exists for API compatibility with the calling code in bluetooth_proxy.py.
-        The batcher is automatically started upon initialization, so this is a no-op.
-        """
         logger.debug("Advertisement batcher started (no-op)")
         # No action needed - batcher is ready to use after initialization
