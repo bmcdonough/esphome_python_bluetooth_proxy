@@ -26,6 +26,7 @@ class MessageType(IntEnum):
     DEVICE_INFO_RESPONSE = 10
     LIST_ENTITIES_REQUEST = 11
     LIST_ENTITIES_DONE_RESPONSE = 19
+    SUBSCRIBE_STATES_REQUEST = 20
 
     # Bluetooth LE messages
     BLUETOOTH_LE_ADVERTISEMENT_RESPONSE = 24
@@ -43,6 +44,7 @@ class MessageType(IntEnum):
     BLUETOOTH_GATT_NOTIFY_DATA_RESPONSE = 36
     BLUETOOTH_GATT_READ_DESCRIPTOR_REQUEST = 37
     BLUETOOTH_GATT_WRITE_DESCRIPTOR_REQUEST = 38
+    BLUETOOTH_SCANNER_STATE_RESPONSE = 39
 
 
 @dataclass
@@ -117,6 +119,29 @@ class ListEntitiesDoneResponse:
     """List entities done response message to client."""
 
     pass
+
+
+@dataclass
+class SubscribeStatesRequest:
+    """Subscribe to state updates request message from client.
+    
+    This is an empty message that triggers initial state updates and 
+    ongoing state update streaming.
+    """
+
+    pass
+
+
+@dataclass
+class BluetoothScannerStateResponse:
+    """Bluetooth scanner state response message to client.
+    
+    Sent when the Bluetooth scanner state changes or as part of initial state updates.
+    """
+
+    active: bool = False
+    scanning: bool = False
+    mode: int = 0  # 0=Classic, 1=BLE, 2=Dual Mode
 
 
 @dataclass
@@ -563,6 +588,26 @@ class MessageEncoder:
             data.extend(encode_varint(msg.error))
 
         return bytes(data)
+        
+    def encode_bluetooth_scanner_state_response(
+        self, msg: BluetoothScannerStateResponse
+    ) -> bytes:
+        """Encode BluetoothScannerStateResponse message."""
+        data = bytearray()
+
+        # Field 1: active (bool)
+        data.extend(b"\x08")  # Field 1, varint
+        data.extend(encode_bool(msg.active))
+        
+        # Field 2: scanning (bool)
+        data.extend(b"\x10")  # Field 2, varint
+        data.extend(encode_bool(msg.scanning))
+        
+        # Field 3: mode (uint32) - 0=Classic, 1=BLE, 2=Dual Mode
+        data.extend(b"\x18")  # Field 3, varint
+        data.extend(encode_varint(msg.mode))
+        
+        return bytes(data)
 
     def encode_bluetooth_gatt_write_response(
         self, msg: BluetoothGATTWriteResponse
@@ -945,6 +990,32 @@ class MessageDecoder:
                 else:
                     raise ProtocolError(f"Unknown wire type: {wire_type}")
 
+        return msg
+        
+    def decode_subscribe_states_request(self, data: bytes) -> SubscribeStatesRequest:
+        """Decode SubscribeStatesRequest message.
+        
+        This is an empty message with no fields to decode.
+        """
+        msg = SubscribeStatesRequest()
+        offset = 0
+        
+        # Skip any unexpected fields (future compatibility)
+        while offset < len(data):
+            field_key, key_size = decode_varint(data, offset)
+            offset += key_size
+            wire_type = field_key & 0x7
+            
+            # Skip unknown field
+            if wire_type == 0:  # varint
+                _, consumed = decode_varint(data, offset)
+                offset += consumed
+            elif wire_type == 2:  # length-delimited
+                length, length_size = decode_varint(data, offset)
+                offset += length_size + length
+            else:
+                raise ProtocolError(f"Unknown wire type: {wire_type}")
+                
         return msg
 
 

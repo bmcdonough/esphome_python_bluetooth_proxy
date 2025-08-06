@@ -16,10 +16,12 @@ from .protocol import (
     BluetoothGATTService,
     BluetoothLEAdvertisementResponse,
     BluetoothLERawAdvertisementsResponse,
+    BluetoothScannerStateResponse,
     ConnectResponse,
     DeviceInfoResponse,
     HelloResponse,
     ListEntitiesDoneResponse,
+    SubscribeStatesRequest,
     MessageDecoder,
     MessageEncoder,
     MessageType,
@@ -66,6 +68,7 @@ class APIConnection:
         self.client_info = ""
         self.client_api_version_major = 1
         self.client_api_version_minor = 10
+        self.subscribed_to_states = False
 
         self.encoder = MessageEncoder()
         self.decoder = MessageDecoder()
@@ -160,6 +163,8 @@ class APIConnection:
                 await self._handle_bluetooth_gatt_read_descriptor_request(payload)
             elif msg_type == MessageType.BLUETOOTH_GATT_WRITE_DESCRIPTOR_REQUEST:
                 await self._handle_bluetooth_gatt_write_descriptor_request(payload)
+            elif msg_type == MessageType.SUBSCRIBE_STATES_REQUEST:
+                await self._handle_subscribe_states_request(payload)
             else:
                 logger.warning(
                     f"Unknown message type {msg_type} from {self.client_address}"
@@ -320,61 +325,55 @@ class APIConnection:
 
             logger.error(traceback.format_exc())
 
-    async def _handle_list_entities_request(self, payload: bytes) -> None:
-        """Handle ListEntitiesRequest message."""
-        logger.info(f"Received ListEntitiesRequest from {self.client_address}")
-
-        # Allow ListEntities requests in CONNECTED state if no password is required
-        # This supports aioesphomeapi client flow:
-        # Hello → DeviceInfo → ListEntities (skip Connect)
-        if self.state == ConnectionState.CONNECTED and self.password is None:
-            logger.debug(
-                f"Allowing ListEntities request from {self.client_address} "
-                f"(no password required)"
-            )
-        elif self.state != ConnectionState.AUTHENTICATED:
-            logger.warning(
-                f"ListEntitiesRequest from unauthenticated client "
-                f"{self.client_address} in state {self.state}"
-            )
-            return
-
-        try:
-            # For now, just send empty entity list (no entities to report)
-            # In future phases, this will include Bluetooth proxy entities
-            logger.debug(f"Sending empty entity list to {self.client_address}")
-
-            response = ListEntitiesDoneResponse()
-            encoded_response = self.encoder.encode_list_entities_done_response(response)
-            logger.debug(
-                f"Encoded list entities done response: {len(encoded_response)} bytes"
-            )
-
-            await self._send_message(
-                MessageType.LIST_ENTITIES_DONE_RESPONSE,
-                encoded_response,
-            )
-
-            logger.info(f"Sent entity list done response to {self.client_address}")
-
-        except Exception as e:
-            logger.error(
-                f"Error handling ListEntitiesRequest from {self.client_address}: {e}"
-            )
-            import traceback
-
-            logger.error(traceback.format_exc())
-
     async def _handle_ping_request(self) -> None:
         """Handle PingRequest message."""
         try:
-            # Send ping response (empty payload)
+            # Empty PingResponse
+            logger.debug(f"Sending ping response to {self.client_address}")
             await self._send_message(MessageType.PING_RESPONSE, b"")
-
-            logger.debug(f"Sent ping response to {self.client_address}")
 
         except Exception as e:
             logger.error(f"Error handling PingRequest from {self.client_address}: {e}")
+
+    async def _handle_subscribe_states_request(self, payload: bytes) -> None:
+        """Handle SubscribeStatesRequest message.
+        
+        This message indicates the client wants to subscribe to state updates.
+        Upon receiving this message, we should:
+        1. Mark the connection as subscribed to state updates
+        2. Send initial state updates for all entities
+        3. Continue sending state updates whenever entity states change
+        """
+        logger.info(f"Received SubscribeStatesRequest from {self.client_address}")
+        
+        if self.state != ConnectionState.AUTHENTICATED:
+            logger.warning(
+                f"SubscribeStatesRequest from unauthenticated client "
+                f"{self.client_address} in state {self.state}"
+            )
+            return
+            
+        try:
+            # Decode the message (though it's empty)
+            self.decoder.decode_subscribe_states_request(payload)
+            
+            # Mark this connection as subscribed to states
+            self.subscribed_to_states = True
+            logger.info(f"Client {self.client_address} subscribed to state updates")
+            
+            # Send initial state updates - for Bluetooth proxy, this includes:
+            # 1. Current Bluetooth scanner state
+            await self._send_bluetooth_scanner_state()
+            
+            # 2. TODO: Add other state information if needed in future updates
+            # (e.g., connected devices list, etc.)
+            
+            logger.info(f"Sent initial state updates to {self.client_address}")
+            
+        except Exception as e:
+            logger.error(
+                f"Error handling SubscribeStatesRequest from {self.client_address}: {e}"
+            )
 
     async def _handle_bluetooth_device_request(self, payload: bytes) -> None:
         """Handle BluetoothDeviceRequest message."""
@@ -695,6 +694,33 @@ class APIConnection:
             except Exception as e:
                 logger.error(f"Error closing connection {self.client_address}: {e}")
 
+    async def _send_bluetooth_scanner_state(self) -> None:
+        """Send current Bluetooth scanner state to client.
+        
+        This is called on initial subscription and whenever the scanner state changes.
+        """
+        if not self.subscribed_to_states:
+            return
+            
+        try:
+            # Create state response with current scanner state
+            # For now using default values - in a full implementation, this would
+            # get the real state from the Bluetooth proxy component
+            scanner_state = BluetoothScannerStateResponse(
+                active=True,  # Bluetooth proxy is active
+                scanning=True,  # Currently scanning
+                mode=1,        # BLE mode
+            )
+            
+            # Encode and send
+            payload = self.encoder.encode_bluetooth_scanner_state_response(scanner_state)
+            await self.send_message(MessageType.BLUETOOTH_SCANNER_STATE_RESPONSE, payload)
+            
+            logger.debug(f"Sent Bluetooth scanner state to {self.client_address}")
+            
+        except Exception as e:
+            logger.error(f"Error sending Bluetooth scanner state: {e}")
+    
     def __str__(self) -> str:
         """String representation of the connection."""
         return (

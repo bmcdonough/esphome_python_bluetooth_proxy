@@ -14,6 +14,7 @@ from .ble_connection import BLEConnection
 from .ble_scanner import BLEAdvertisement, BLEScanner
 from .connection import APIConnection
 from .gatt_operations import GATTOperationHandler
+from .protocol import BluetoothScannerStateResponse, MessageType
 
 if TYPE_CHECKING:
     from .api_server import ESPHomeAPIServer
@@ -142,19 +143,20 @@ class BluetoothProxy:
             api_connection: API connection to subscribe
             flags: Subscription flags
         """
-        if api_connection in self.subscribed_connections:
-            logger.warning(f"API connection {api_connection} already subscribed")
-            return
+        if api_connection not in self.subscribed_connections:
+            self.subscribed_connections.append(api_connection)
+            logger.info(
+                f"Subscribed API connection {api_connection} to Bluetooth events "
+                f"(flags=0x{flags:08X})"
+            )
 
-        self.subscribed_connections.append(api_connection)
-        logger.info(f"Subscribed API connection {api_connection} (flags=0x{flags:02x})")
+            # Send current scanner state to new subscription
+            if api_connection.subscribed_to_states:
+                asyncio.create_task(self._send_scanner_state(api_connection))
 
-        # Start scanning if this is the first subscription
-        if len(self.subscribed_connections) == 1 and not self.scanning_enabled:
-            await self._start_scanning()
-
-        # Send current scanner state
-        await self._send_scanner_state(api_connection)
+            # Start scanning if this is the first subscription
+            if len(self.subscribed_connections) == 1 and not self.scanning_enabled:
+                await self._start_scanning()
 
     async def unsubscribe_api_connection(self, api_connection: APIConnection) -> None:
         """Unsubscribe API connection from Bluetooth events.
@@ -175,45 +177,47 @@ class BluetoothProxy:
 
     async def _start_scanning(self) -> None:
         """Start BLE scanning."""
-        if self.scanning_enabled or not self.scanner:
+        if not self.scanner or self.scanning_enabled:
             return
 
-        logger.info("Starting BLE scanning")
-
         try:
-            await self.scanner.start_scanning(
-                active=True
-            )  # Start with active scanning (more reliable)
+            logger.info("Starting BLE scanning")
+            await self.scanner.start_scanning()
             self.scanning_enabled = True
+            logger.info("BLE scanning started")
 
-            # Notify all subscribed connections
-            for connection in self.subscribed_connections:
-                await self._send_scanner_state(connection)
+            # Start advertisement batcher if available
+            if self.advertisement_batcher:
+                self.advertisement_batcher.start()
+
+            # Notify all subscribed connections about scanner state change
+            await self._notify_scanner_state_change()
 
         except Exception as e:
-            logger.error(f"Failed to start BLE scanning: {e}")
+            logger.error(f"Error starting BLE scanning: {e}")
 
     async def _stop_scanning(self) -> None:
         """Stop BLE scanning."""
-        if not self.scanning_enabled or not self.scanner:
+        if not self.scanner or not self.scanning_enabled:
             return
 
-        logger.info("Stopping BLE scanning")
-
         try:
+            logger.info("Stopping BLE scanning")
+
+            # Stop advertisement batcher if available
+            if self.advertisement_batcher:
+                self.advertisement_batcher.stop()
+
+            # Stop scanner
             await self.scanner.stop_scanning()
             self.scanning_enabled = False
+            logger.info("BLE scanning stopped")
 
-            # Flush any pending advertisements
-            if self.advertisement_batcher:
-                await self.advertisement_batcher.force_flush()
-
-            # Notify all subscribed connections
-            for connection in self.subscribed_connections:
-                await self._send_scanner_state(connection)
+            # Notify all subscribed connections about scanner state change
+            await self._notify_scanner_state_change()
 
         except Exception as e:
-            logger.error(f"Failed to stop BLE scanning: {e}")
+            logger.error(f"Error stopping BLE scanning: {e}")
 
     def _on_advertisement(self, advertisement: BLEAdvertisement) -> None:
         """Handle received BLE advertisement.
@@ -251,12 +255,32 @@ class BluetoothProxy:
         Args:
             api_connection: API connection to send state to
         """
-        # TODO: Implement scanner state message
-        # This will be implemented when we add the protobuf messages
-        logger.debug(
-            f"Sending scanner state to {api_connection} "
-            f"(scanning={self.scanning_enabled})"
-        )
+        # Only send state if the connection is subscribed to states
+        if not api_connection.subscribed_to_states:
+            return
+            
+        try:
+            # Create scanner state response message
+            scanner_state = BluetoothScannerStateResponse(
+                active=self.active,                     # Whether active connections are enabled
+                scanning=self.scanner.is_scanning() if self.scanner else False,  # Current scanning state
+                mode=1 if self.scanner and self.scanner.get_scan_mode() else 0,  # 0=Classic, 1=BLE
+            )
+            
+            # Send scanner state response
+            await api_connection.send_message(
+                MessageType.BLUETOOTH_SCANNER_STATE_RESPONSE,
+                api_connection.encoder.encode_bluetooth_scanner_state_response(scanner_state)
+            )
+            
+            logger.debug(
+                f"Sent scanner state to {api_connection}: "
+                f"active={scanner_state.active}, "
+                f"scanning={scanner_state.scanning}, "
+                f"mode={scanner_state.mode}"
+            )
+        except Exception as e:
+            logger.error(f"Error sending scanner state to {api_connection}: {e}")
 
     async def connect_device(self, address: int, address_type: int) -> bool:
         """Connect to a BLE device.
@@ -375,6 +399,9 @@ class BluetoothProxy:
             self.active = active
             self.api_server.set_active_connections(active)
             logger.info(f"Active connections {'enabled' if active else 'disabled'}")
+            
+            # Notify all subscribed connections about state change
+            asyncio.create_task(self._notify_scanner_state_change())
 
     def has_active(self) -> bool:
         """Check if active connections are supported.
@@ -393,7 +420,21 @@ class BluetoothProxy:
         if self.scanner:
             self.scanner.set_scan_mode(active)
             logger.info(f"Scanner mode set to {'active' if active else 'passive'}")
+            
+            # Notify all subscribed connections about state change
+            await self._notify_scanner_state_change()
 
+    async def _notify_scanner_state_change(self) -> None:
+        """Notify all subscribed connections about scanner state changes."""
+        tasks = []
+        for api_connection in self.subscribed_connections:
+            if api_connection.subscribed_to_states:
+                tasks.append(self._send_scanner_state(api_connection))
+                
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+            logger.debug(f"Notified {len(tasks)} connections about scanner state change")
+    
     def get_stats(self) -> dict:
         """Get Bluetooth proxy statistics.
 
