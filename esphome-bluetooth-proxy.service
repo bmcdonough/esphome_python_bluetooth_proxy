@@ -1,0 +1,21 @@
+[Unit]
+Description=ESPHome Python Bluetooth Proxy
+After=network.target bluetooth.target
+Wants=bluetooth.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/wrmcd/github/bmcdonough/esphome_python_bluetooth_proxy
+ExecStart=/usr/bin/python3 /home/wrmcd/github/bmcdonough/esphome_python_bluetooth_proxy/esphome_bluetooth_proxy_daemon.py --log-file /var/log/esphome-bluetooth-proxy.log
+Restart=on-failure
+RestartSec=5s
+KillSignal=SIGINT
+
+# Optional security features
+# ProtectSystem=full
+# PrivateTmp=true
+# NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
